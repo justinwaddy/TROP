@@ -1,0 +1,8 @@
+v 1.0.0
+d Damian Clarke and Justin Waddy
+d dclarke@fen.uchile.cl - j.waddy@exeter.ac.uk
+d https://github.com/justinwaddy/trop
+
+d 'trop': Triply Robust Panel Estimator
+
+p trop
