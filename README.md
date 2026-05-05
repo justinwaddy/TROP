@@ -1,6 +1,6 @@
 # TROP: Triply Robust Panel Estimators
 
-This Stata package implements Triply Robust Panel Estimators (TROP) following Athey et al. (2025). TROP is a panel-data estimator for treatment effects that combines a flexible model for the potential outcomes, with unit weights intended to upweight units similar to the treated units, and time weights intended to upweight time periods close to treated time periods. 
+This Stata package implements Triply Robust Panel Estimators (TROP) following Athey et al. (2025). TROP is a panel-data estimator for treatment effects. It combines a flexible model for potential outcomes, with unit weights which upweight units similar to the treated units, and time weights which upweight the time periods closest to treatment.
 
 ## Overview
 
