@@ -22,9 +22,9 @@ where $\alpha_i$ and $\beta_t$ are unit and time fixed effects, and $\mathbf{L}$
 
 ### The Estimator
 
-For a treated unit–period pair $(i^*, t^*)$, TROP jointly estimates fixed effects and the low-rank component by solving a **doubly-weighted nuclear-norm penalized regression** over all control observations:
+For a treated unit–period pair $(i^{*}, t^{*})$, TROP jointly estimates fixed effects and the low-rank component by solving a **doubly-weighted nuclear-norm penalized regression** over all control observations:
 
-$$(\hat\alpha, \hat\beta, \hat{\mathbf{L}}) = \operatorname*{arg\,min}_{\alpha,\beta,\mathbf{L}} \sum_{j,s} \theta_s^{i,t}\,\omega_j^{i,t}(1 - W_{js})\bigl(Y_{js} - \alpha_j - \beta_s - L_{js}\bigr)^2 + \lambda_{nn}\|\mathbf{L}\|_*$$
+$$(\hat\alpha, \hat\beta, \hat{\mathbf{L}}) = \underset{\alpha,\beta,\mathbf{L}}{\text{arg min}} \sum_{j,s} \theta_s^{i,t}\,\omega_j^{i,t}(1 - W_{js})\bigl(Y_{js} - \alpha_j - \beta_s - L_{js}\bigr)^2 + \lambda_{nn}\|\mathbf{L}\|_*$$
 
 The treatment effect estimate is then:
 
