@@ -10,7 +10,7 @@ TROP operates on an $N \times T$ panel of outcomes $\mathbf{Y}$ and binary treat
 
 $$\tau = \frac{\sum_{i,t} W_{it}\bigl(Y_{it}(1) - Y_{it}(0)\bigr)}{\sum_{i,t} W_{it}}$$
 
-Unlike SC and SDID, TROP accommodates **general assignment patterns** — units can move into and out of treatment, and there is no requirement of staggered adoption.
+Unlike [SC](https://www.mit.edu/~jhainm/synthpage.html) and [SDID](https://github.com/Daniel-Pailanir/sdid), TROP accommodates **general assignment patterns** — units can move into and out of treatment, and there is no requirement of staggered adoption.
 
 ### The Outcome Model
 
@@ -22,7 +22,7 @@ where $\alpha_i$ and $\beta_t$ are unit and time fixed effects, and $\mathbf{L}$
 
 ### The Estimator
 
-For a treated unit–period pair $(i^{*}, t^{*})$, TROP jointly estimates fixed effects and the low-rank component by solving a **doubly-weighted nuclear-norm penalized regression** over all control observations:
+For a treated unit–period pair $(i^{\*}, t^{\*})$, TROP jointly estimates fixed effects and the low-rank component by solving a **doubly-weighted nuclear-norm penalized regression** over all control observations:
 
 $$(\hat\alpha, \hat\beta, \hat{\mathbf{L}}) = \underset{\alpha,\beta,\mathbf{L}}{\text{arg min}} \sum_{j,s} \theta_s^{i,t}\,\omega_j^{i,t}(1 - W_{js})\bigl(Y_{js} - \alpha_j - \beta_s - L_{js}\bigr)^2 + \lambda_{nn}\|\mathbf{L}\|_*$$
 
@@ -41,11 +41,11 @@ TROP uses two sets of exponentially decaying weights, governed by a tuning tripl
 
 **Time weights** discount periods further from the treatment date:
 
-$$\theta_s^{i,t}(\lambda) = \exp\!\Bigl(-\lambda_\text{time} \cdot |t - s|\Bigr)$$
+$$\theta_s^{i,t}(\lambda) = \exp\Bigl(-\lambda_\text{time} \cdot |t - s|\Bigr)$$
 
 **Unit weights** downweight control units whose pre-treatment trajectories diverge from the treated unit's:
 
-$$\omega_j^{i,t}(\lambda) = \exp\!\left(-\lambda_\text{unit} \cdot \left(\frac{\sum_{u \neq t}(1-W_{iu})(1-W_{ju})(Y_{iu}-Y_{ju})^2}{\sum_{u \neq t}(1-W_{iu})(1-W_{ju})}\right)^{1/2}\right)$$
+$$\omega_j^{i,t}(\lambda) = \exp\left(-\lambda_\text{unit} \cdot \left(\frac{\sum_{u \neq t}(1-W_{iu})(1-W_{ju})(Y_{iu}-Y_{ju})^2}{\sum_{u \neq t}(1-W_{iu})(1-W_{ju})}\right)^{1/2}\right)$$
 
 ### Tuning via Leave-One-Out Cross-Validation
 
