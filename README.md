@@ -1,6 +1,6 @@
 # TROP: Triply Robust Panel Estimators
 
-This Stata package implements Triply Robust Panel Estimators (TROP) following Athey et al. (2025). TROP is a panel-data estimator for treatment effects. It combines a flexible model for potential outcomes, with unit weights which upweight units similar to the treated units, and time weights which upweight the time periods closest to treatment.
+This Stata package implements Triply Robust Panel Estimators (TROP) following [Athey et al. (2025)](#references). TROP is a panel-data estimator for treatment effects. It combines a flexible model for potential outcomes, with unit weights which upweight units similar to the treated units, and time weights which upweight the time periods closest to treatment.
 
 ## Overview
 
@@ -10,7 +10,7 @@ TROP operates on an $N \times T$ panel of outcomes $\mathbf{Y}$ and binary treat
 
 $$\tau = \frac{\sum_{i,t} W_{it}\bigl(Y_{it}(1) - Y_{it}(0)\bigr)}{\sum_{i,t} W_{it}}$$
 
-Unlike [SC](https://www.mit.edu/~jhainm/synthpage.html) and [SDID](https://github.com/Daniel-Pailanir/sdid), TROP accommodates **general assignment patterns** — units can move into and out of treatment, and there is no requirement of staggered adoption.
+Unlike [SC](https://www.mit.edu/~jhainm/synthpage.html) ([Abadie et al., 2010](#references)) and [SDID](https://github.com/Daniel-Pailanir/sdid) ([Arkhangelsky et al., 2021](#references)), TROP accommodates **general assignment patterns** in which units can move into and out of treatment, and there is no requirement of staggered adoption.
 
 ### The Outcome Model
 
@@ -69,4 +69,8 @@ where $Y$ is an outcome of interest, $S$ and $T$ are variables indicating unit a
 
 
 ## References
+Abadie, A., Diamond, A., & Hainmueller, J. (2010). [Synthetic control methods for comparative case studies: Estimating the effect of California's tobacco control program](https://doi.org/10.1198/jasa.2009.ap08746). *Journal of the American Statistical Association*, 105(490), 493–505.
+
+Arkhangelsky, D., Athey, S., Hirshberg, D. A., Imbens, G. W., & Wager, S. (2021). [Synthetic difference-in-differences](https://doi.org/10.1257/aer.20190159). *American Economic Review*, 111(12), 4088–4118.
+
 Athey, S., Imbens, G., Qu, Z., & Viviano, D. (2025). [Triply robust panel estimators](https://arxiv.org/pdf/2508.21536). arXiv preprint arXiv:2508.21536.
