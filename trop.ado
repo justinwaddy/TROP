@@ -15,8 +15,8 @@ version 15.0
 #delimit ;
 syntax varlist(min=4 max=4) [if] [in],
     [
-    lambda_unit(real 0)
-    lambda_time(real 0)
+    lambda_unit(string)
+    lambda_time(string)
     lambda_nn(string)
     treated_periods(integer 10)
     solver(string)
@@ -74,6 +74,8 @@ if `"`r(balanced)'"'!="strongly balanced" {
     dis as error "Panel is unbalanced."
     exit 451
 }
+local N = r(N_g)
+local T = r(Tmax)
 
 qui count if `1'==.
 if r(N)!=0 {
@@ -93,6 +95,11 @@ if r(N)!=0 {
 qui sum `4'
 if (r(min)==0 & r(max)==0)==1 {
     di as error "All units are controls."
+    exit 459
+}
+qui sum `4'
+if (r(min)==1 & r(max)==1)==1 {
+    di as error "All units are treated."
     exit 459
 }
 
@@ -159,10 +166,32 @@ else {
 * (1) Set-up 
 *------------------------------------------------------------------------------*
 *Prepare dataset before treatment. See example prep: https://github.com/ostasovskyi/TROP-Estimator/blob/main/notebooks/tutorial.ipynb?short_path=b4fd5c7
+if (length("`if'")+length("`in'")>0) {
+    preserve
+    qui keep if `touse'
+}
 
+*Wide panels
+mata: Y = rowshape(st_data(., "`1'"), `N')
+mata: W = rowshape(st_data(., "`4'"), `N')
+
+tempvar ever_treated unit_row unit_tag
+
+qui bys `2': egen `ever_treated' = max(`4')
+qui egen `unit_row' = group(`2')
+qui egen `unit_tag' = tag(`2')
+
+qui levelsof `unit_row' if `ever_treated' == 1 & `unit_tag' == 1, local(treated_rows)
+local n_treated : word count `treated_rows'
+
+drop `ever_treated' `unit_row' `unit_tag'
+
+if (length("`if'")+length("`in'")>0) {
+    restore
+}
 
 *------------------------------------------------------------------------------*
-* (2) Calculate ATT (jackknife will be default)
+* (2) Calculate ATT
 *------------------------------------------------------------------------------*
 *Core function will be in this section
 
@@ -193,3 +222,39 @@ ereturn clear
 *------------------------------------------------------------------------------*
 * (8) Mata functions
 *------------------------------------------------------------------------------*
+cap mata: mata drop trop_cell_weights()
+
+mata:
+void trop_cell_weights(Y, treated_units, lambda_unit, lambda_time,
+                         treated_periods, delta, delta_unit, delta_time)
+{
+    real scalar N, T, center
+    real rowvector dist_time, avg_treated
+    real colvector dist_unit, A, B
+    real matrix mask, sqdiff
+
+    N = rows(Y)
+    T = cols(Y)
+
+    // Time distances (matches Python's 0-based np.arange convention)
+    center    = T - treated_periods / 2
+    dist_time = abs(((1..T) :- 1) :- center)
+
+    // Pre-period mask: 1 in pre, 0 in last treated_periods columns
+    mask = J(N, T, 1)
+    mask[., (T - treated_periods + 1)..T] = J(N, treated_periods, 0)
+
+    // Reference trajectory: column mean over treated-unit rows
+    avg_treated = mean(Y[treated_units, .])
+
+    // RMS pre-period distance from each unit to the reference
+    sqdiff    = (J(N, 1, 1) * avg_treated - Y) :^ 2
+    A         = rowsum(sqdiff :* mask)
+    B         = rowsum(mask)
+    dist_unit = sqrt(A :/ B)
+
+    delta_unit = exp(-lambda_unit :* dist_unit)
+    delta_time = exp(-lambda_time :* dist_time)
+    delta      = delta_unit * delta_time
+}
+end
