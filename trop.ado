@@ -193,10 +193,23 @@ if (length("`if'")+length("`in'")>0) {
 *------------------------------------------------------------------------------*
 * (2) Calculate ATT
 *------------------------------------------------------------------------------*
-*Core function will be in this section
-
 *First subsection will be cross-validation code to tune parameters for lambda_unit, lambda_time and lambda_nn if they are not provided.
-*If these are provided, then next subsection determines the ATT
+
+*CV Placeholder
+
+*Core function will be in this section
+mata: treated_units = strtoreal(tokens(st_local("treated_rows")))'
+if `lambda_unit_set' local lu = `lambda_unit'
+else                 local lu = 0
+
+if `lambda_time_set' local lt = `lambda_time'
+else                 local lt = 0    
+mata: delta = .; delta_unit = .; delta_time = .
+mata: trop_cell_weights(Y, treated_units, `lu', `lt', `treated_periods', ///
+                          delta, delta_unit, delta_time)
+mata: tau_hat = .; mu_hat = .; alpha_hat = .; beta_hat = .
+mata: trop_fit_wls(Y, W, delta, tau_hat, mu_hat, alpha_hat, beta_hat)
+mata: st_local("tau_hat", strofreal(tau_hat))
 
 *--------------------------------------------------------------------------*
 * (3) Standard error: bootstrap
@@ -256,5 +269,74 @@ void trop_cell_weights(Y, treated_units, lambda_unit, lambda_time,
     delta_unit = exp(-lambda_unit :* dist_unit)
     delta_time = exp(-lambda_time :* dist_time)
     delta      = delta_unit * delta_time
+}
+end
+
+* ----------------------------------------------------------------------------
+cap mata: mata drop trop_fit_wls()
+
+* trop_fit_wls: weighted two-way fixed effects estimator with treatment.
+*
+* Solves
+*   min_{mu, alpha, beta, tau}
+*     sum_{i,t} (1 - W_it) * delta_it * (Y_it - mu - alpha_i - beta_t - W_it*tau)^2
+*
+* Design matrix is built via Kronecker products:
+*   X = [1_{NT}, (I_{N-1} kron 1_T), (1_N kron I_{T-1}), vec(W')]
+*
+* Unit FE for unit 1 and time FE for time 1 are absorbed into mu (TWFE
+* normalization). Observations are vectorized in row-major order:
+*   row = (i-1)*T + t  for unit i, time t.
+*
+* Inputs
+*   Y     : N x T outcome matrix
+*   W     : N x T binary treatment indicator
+*   delta : N x T weight matrix from trop_weights_pooled
+*
+* Outputs (written through implicit pass-by-reference)
+*   tau   : scalar treatment effect estimate
+*   mu    : scalar intercept
+*   alpha : N x 1 unit fixed effects (alpha[1] = 0 by normalization)
+*   beta  : 1 x T time fixed effects (beta[1] = 0 by normalization)
+
+mata:
+void trop_fit_wls(Y, W, delta, tau, mu, alpha, beta)
+{
+    real scalar N, T, NT, p
+    real colvector y_vec, w_diag, b
+    real matrix X, D_unit, D_time, XtWX, XtWy
+
+    N  = rows(Y)
+    T  = cols(Y)
+    NT = N * T
+
+    // Vectorize Y, W, weights in row-major order (unit-then-time stacking).
+    // rowshape(M', 1)' takes a matrix and stacks rows; equivalent to
+    // vec(M') in standard notation.
+    y_vec  = rowshape(Y, NT)
+    w_diag = rowshape((1 :- W) :* delta, NT)
+
+    // Unit dummy block: I_{N-1} kron 1_T  (drop unit 1 for normalization)
+    // Result is NT x (N-1).
+    D_unit = I(N)[., 2..N] # J(T, 1, 1)
+
+    // Time dummy block: 1_N kron I_{T-1}  (drop time 1 for normalization)
+    // Result is NT x (T-1).
+    D_time = J(N, 1, 1) # I(T)[., 2..T]
+
+    // Stack design: [intercept, D_unit, D_time, vec(W')]
+    p = 1 + (N - 1) + (T - 1) + 1
+    X = J(NT, 1, 1), D_unit, D_time, rowshape(W, NT)
+
+    // Weighted normal equations
+    XtWX = quadcross(X, w_diag, X)
+    XtWy = quadcross(X, w_diag, y_vec)
+    b    = invsym(XtWX) * XtWy
+
+    // Unpack
+    mu    = b[1]
+    alpha = 0 \ b[2 .. N]                  // alpha[1] = 0
+    beta  = (0, b[N + 1 .. N + T - 1]')    // beta[1]  = 0
+    tau   = b[p]
 }
 end
