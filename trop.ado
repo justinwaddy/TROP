@@ -19,7 +19,6 @@ program define trop, eclass
         lambda_time(string)
         lambda_nn(string)
         treated_periods(integer 10)
-        solver(string)
         vce(string)
         reps(integer 200)
         seed(integer 0)
@@ -29,9 +28,7 @@ program define trop, eclass
         nn_grid(numlist)
         n_treated_units(integer 1)
         kfold(integer 0)
-        n_jobs(integer 1)
         level(integer 95)
-        graph
         returnweights
         generate(string)
         verbose
