@@ -1,5 +1,5 @@
 *! trop: Triply Robust Panel Estimators
-*! Version 0.x.x May 5, 2025 
+*! Version 0.1.1 May 19, 2026
 *! Author: Clarke Damian, Justin Waddy
 *! dclarke@fen.uchile.cl, j.waddy@exeter.ac.uk
 
@@ -8,259 +8,348 @@ Versions
 0.1.0 May 05, 2025: Pre-release
 */
 
-cap program drop trop
-program trop, eclass
-version 15.0
+capture program drop trop
+program define trop, eclass
+    version 15.0
 
-#delimit ;
-syntax varlist(min=4 max=4) [if] [in],
-    [
-    lambda_unit(string)
-    lambda_time(string)
-    lambda_nn(string)
-    treated_periods(integer 10)
-    solver(string)
-    vce(string)
-    reps(integer 200)
-    seed(integer 0)
-    cv(string)
-    unit_grid(numlist)
-    time_grid(numlist)
-    nn_grid(numlist)
-    n_treated_units(integer 1)
-    kfold(integer 0)
-    n_jobs(integer 1)
-    level(integer 95)
-    graph
-    returnweights
-    generate(string)
-    verbose
-    ]
-    ;
-#delimit cr
+    #delimit ;
+    syntax varlist(min=4 max=4 numeric) [if] [in],
+        [
+        lambda_unit(string)
+        lambda_time(string)
+        lambda_nn(string)
+        treated_periods(integer 10)
+        solver(string)
+        vce(string)
+        reps(integer 200)
+        seed(integer 0)
+        cv(string)
+        unit_grid(numlist)
+        time_grid(numlist)
+        nn_grid(numlist)
+        n_treated_units(integer 1)
+        kfold(integer 0)
+        n_jobs(integer 1)
+        level(integer 95)
+        graph
+        returnweights
+        generate(string)
+        verbose
+        ]
+        ;
+    #delimit cr
 
-*Above we'll follow the same core inputs: outcome variable, unit ID, time variable, and treatment variable.
-*Can discuss later whether they explicitly want the lambda inputs to always be chosen by the user
-
-*------------------------------------------------------------------------------*
-* (0) Error checks
-*------------------------------------------------------------------------------*
-*Temporary dataset called touse
-tempvar touse
-mark `touse' `if' `in'
-
-*Declare boolean, check if numeric, create numberic id if not. 
-local stringvar=0 
-cap count if `2'==0
-if _rc!=0 {
-    local stringvar=1
-    local groupvar `2'
-    tempvar ID
-    egen `ID' = group(`2')
-    local varlist `1' `ID' `3' `4'
+    *--------------------------------------------------------------------------*
+    * (0) Parse inputs
+    *--------------------------------------------------------------------------*
     tokenize `varlist'
-}
-else {
-    tokenize `varlist'
-}
+    local outcome  `1'
+    local unitvar  `2'
+    local timevar  `3'
+    local treatvar `4'
 
-if (length("`if'")+length("`in'")>0) {
+    tempvar touse
+    mark `touse' `if' `in'
+
+    *--------------------------------------------------------------------------*
+    * (1) Work only on estimation sample
+    *--------------------------------------------------------------------------*
     preserve
-    qui keep if `touse'
-}
+        quietly keep if `touse'
 
-qui xtset `2' `3'
-if `"`r(balanced)'"'!="strongly balanced" {
-    dis as error "Panel is unbalanced."
-    exit 451
-}
-local N = r(N_g)
-local T = r(Tmax)
+        * If unit ID is string, convert to numeric group ID
+        capture confirm numeric variable `unitvar'
+        if _rc {
+            tempvar _unit_id
+            egen `_unit_id' = group(`unitvar')
+            local unitvar `_unit_id'
+        }
 
-qui count if `1'==.
-if r(N)!=0 {
-    dis as error "Missing values found in dependent variable.  A balanced panel without missing observations is required."
-    exit 416
-}
-qui count if `4'==.
-if r(N)!=0 {
-    dis as error "Missing values found in treatment variable.  A balanced panel without missing observations is required."
-    exit 416
-}
-qui count if `4'!=0&`4'!=1
-if r(N)!=0 {
-    dis as error "Treatment variable takes values distinct from 0 and 1."
-    exit 450
-}
-qui sum `4'
-if (r(min)==0 & r(max)==0)==1 {
-    di as error "All units are controls."
-    exit 459
-}
-qui sum `4'
-if (r(min)==1 & r(max)==1)==1 {
-    di as error "All units are treated."
-    exit 459
-}
+        *------------------------------------------------------------------*
+        * (2) Basic panel and variable checks
+        *------------------------------------------------------------------*
+        quietly xtset `unitvar' `timevar'
 
-*Restore dataset
-if (length("`if'")+length("`in'")>0) {
+        if `"`r(balanced)'"' != "strongly balanced" {
+            di as error "Panel is unbalanced. trop currently requires a strongly balanced panel."
+            exit 451
+        }
+
+        quietly count if missing(`outcome')
+        if r(N) != 0 {
+            di as error "Missing values found in dependent variable. A balanced panel without missing observations is required."
+            exit 416
+        }
+
+        quietly count if missing(`treatvar')
+        if r(N) != 0 {
+            di as error "Missing values found in treatment variable. A balanced panel without missing observations is required."
+            exit 416
+        }
+
+        quietly count if !inlist(`treatvar', 0, 1)
+        if r(N) != 0 {
+            di as error "Treatment variable takes values distinct from 0 and 1."
+            exit 450
+        }
+
+        quietly summarize `treatvar', meanonly
+        if r(min) == 0 & r(max) == 0 {
+            di as error "All units are controls."
+            exit 459
+        }
+        if r(min) == 1 & r(max) == 1 {
+            di as error "All units are treated."
+            exit 459
+        }
+
+        if `treated_periods' <= 0 {
+            di as error "treated_periods() must be a positive integer."
+            exit 198
+        }
+
+        *------------------------------------------------------------------*
+        * (3) Robust panel dimensions
+        *------------------------------------------------------------------*
+        tempvar unit_tag time_tag
+        quietly egen `unit_tag' = tag(`unitvar')
+        quietly egen `time_tag' = tag(`timevar')
+
+        quietly count if `unit_tag'
+        local N = r(N)
+
+        quietly count if `time_tag'
+        local T = r(N)
+
+        drop `unit_tag' `time_tag'
+
+        quietly count
+        local NT = r(N)
+
+        if `NT' != `N' * `T' {
+            di as error "Internal panel dimension error: observations are not equal to N*T."
+            di as error "Detected N = `N', T = `T', observations = `NT'."
+            exit 459
+        }
+
+        if `treated_periods' >= `T' {
+            di as error "treated_periods() must be smaller than the total number of time periods."
+            di as error "Detected T = `T', treated_periods = `treated_periods'."
+            exit 198
+        }
+
+        if "`verbose'" != "" {
+            di as txt "Detected N units       = `N'"
+            di as txt "Detected T periods     = `T'"
+            di as txt "Detected observations  = `NT'"
+            di as txt "Treated post periods   = `treated_periods'"
+        }
+
+        *------------------------------------------------------------------*
+        * (4) Tuning parameters
+        *------------------------------------------------------------------*
+        local lambda_unit_set = 0
+        if "`lambda_unit'" != "" {
+            capture confirm number `lambda_unit'
+            if _rc {
+                di as error "lambda_unit() must be a nonnegative real."
+                exit 198
+            }
+            if `lambda_unit' < 0 {
+                di as error "lambda_unit() must be nonnegative."
+                exit 198
+            }
+            local lambda_unit_set = 1
+        }
+
+        local lambda_time_set = 0
+        if "`lambda_time'" != "" {
+            capture confirm number `lambda_time'
+            if _rc {
+                di as error "lambda_time() must be a nonnegative real."
+                exit 198
+            }
+            if `lambda_time' < 0 {
+                di as error "lambda_time() must be nonnegative."
+                exit 198
+            }
+            local lambda_time_set = 1
+        }
+
+        * lambda_nn is parsed for now but not yet used by this minimal WLS implementation
+        local lambda_nn_set = 0
+        local lambda_nn_inf = 0
+        if "`lambda_nn'" == "" {
+            * unspecified -> later CV placeholder
+        }
+        else if inlist(lower("`lambda_nn'"), "inf", "infinity", ".") {
+            local lambda_nn_inf = 1
+            local lambda_nn_set = 1
+        }
+        else {
+            capture confirm number `lambda_nn'
+            if _rc {
+                di as error "lambda_nn() must be a nonnegative real, or one of {inf, infinity, .}."
+                exit 198
+            }
+            if `lambda_nn' < 0 {
+                di as error "lambda_nn() must be nonnegative."
+                exit 198
+            }
+            local lambda_nn_set = 1
+        }
+
+        if `lambda_unit_set' local lu = `lambda_unit'
+        else                 local lu = 0
+
+        if `lambda_time_set' local lt = `lambda_time'
+        else                 local lt = 0
+
+        *------------------------------------------------------------------*
+        * (5) Identify treated units
+        *------------------------------------------------------------------*
+        tempvar ever_treated unit_row unit_tag2
+        quietly bysort `unitvar': egen `ever_treated' = max(`treatvar')
+        quietly egen `unit_row' = group(`unitvar')
+        quietly egen `unit_tag2' = tag(`unitvar')
+
+        quietly levelsof `unit_row' if `ever_treated' == 1 & `unit_tag2' == 1, local(treated_rows)
+        local n_treated : word count `treated_rows'
+
+        if `n_treated' == 0 {
+            di as error "No treated units found."
+            exit 459
+        }
+
+        if "`verbose'" != "" {
+            di as txt "Detected treated units = `n_treated'"
+            di as txt "Treated rows           = `treated_rows'"
+        }
+
+        *------------------------------------------------------------------*
+        * (6) Wide matrices
+        *------------------------------------------------------------------*
+        sort `unitvar' `timevar'
+
+        mata: Y = rowshape(st_data(., "`outcome'"), `N')
+        mata: W = rowshape(st_data(., "`treatvar'"), `N')
+
+        if "`verbose'" != "" {
+            mata: printf("rows(Y), cols(Y) = %g, %g\n", rows(Y), cols(Y))
+            mata: printf("rows(W), cols(W) = %g, %g\n", rows(W), cols(W))
+        }
+
+        *------------------------------------------------------------------*
+        * (7) Estimate
+        *------------------------------------------------------------------*
+        mata: treated_units = strtoreal(tokens(st_local("treated_rows")))'
+
+        mata: delta = .; delta_unit = .; delta_time = .
+        mata: trop_cell_weights(Y, treated_units, `lu', `lt', `treated_periods', ///
+                                 delta, delta_unit, delta_time)
+
+        mata: tau_hat = .; mu_hat = .; alpha_hat = .; beta_hat = .
+        mata: trop_fit_wls(Y, W, delta, tau_hat, mu_hat, alpha_hat, beta_hat)
+
+        mata: st_numscalar("r(tau_hat)", tau_hat)
+        scalar tau_hat_scalar = r(tau_hat)
+
+        * Optional generated fitted residual components can be added later.
+        if "`generate'" != "" {
+            di as error "generate() is not implemented yet."
+            exit 198
+        }
+
+        *------------------------------------------------------------------*
+        * (8) Return results
+        *------------------------------------------------------------------*
+        ereturn clear
+        ereturn scalar tau = tau_hat_scalar
+        ereturn scalar N = `N'
+        ereturn scalar T = `T'
+        ereturn scalar N_treated = `n_treated'
+        ereturn scalar treated_periods = `treated_periods'
+        ereturn scalar lambda_unit = `lu'
+        ereturn scalar lambda_time = `lt'
+
+        ereturn local cmd "trop"
+        ereturn local outcome "`outcome'"
+        ereturn local unitvar "`unitvar'"
+        ereturn local timevar "`timevar'"
+        ereturn local treatvar "`treatvar'"
+
+        di as txt _newline "Triply Robust Panel Estimator"
+        di as txt "--------------------------------"
+        di as txt "ATT estimate = " as result %9.6f e(tau)
+
     restore
-}
-
-*--- Tuning parameters ---*
-local lambda_unit_set = 0
-if "`lambda_unit'" != "" {
-    cap confirm number `lambda_unit'
-    if _rc {
-        di as error "lambda_unit() must be a nonnegative real."
-        exit 198
-    }
-    if `lambda_unit' < 0 {
-        di as error "lambda_unit() must be nonnegative."
-        exit 198
-    }
-    local lambda_unit_set = 1
-}
-
-local lambda_time_set = 0
-if "`lambda_time'" != "" {
-    cap confirm number `lambda_time'
-    if _rc {
-        di as error "lambda_time() must be a nonnegative real."
-        exit 198
-    }
-    if `lambda_time' < 0 {
-        di as error "lambda_time() must be nonnegative."
-        exit 198
-    }
-    local lambda_time_set = 1
-}
-
-* lambda_nn: empty (CV chooses), "inf"/"infinity"/"." (drop L), else nonneg real
-local lambda_nn_set = 0
-local lambda_nn_inf = 0
-if "`lambda_nn'" == "" {
-    * unspecified -> resolved by CV later
-}
-else if inlist(lower("`lambda_nn'"), "inf", "infinity", ".") {
-    local lambda_nn_inf = 1
-    local lambda_nn_set = 1
-}
-else {
-    cap confirm number `lambda_nn'
-    if _rc {
-        di as error "lambda_nn() must be a nonnegative real, or one of {inf, infinity, .}."
-        exit 198
-    }
-    if `lambda_nn' < 0 {
-        di as error "lambda_nn() must be nonnegative."
-        exit 198
-    }
-    local lambda_nn_set = 1
-}
-
+end
 
 
 *------------------------------------------------------------------------------*
-* (1) Set-up 
-*------------------------------------------------------------------------------*
-*Prepare dataset before treatment. See example prep: https://github.com/ostasovskyi/TROP-Estimator/blob/main/notebooks/tutorial.ipynb?short_path=b4fd5c7
-if (length("`if'")+length("`in'")>0) {
-    preserve
-    qui keep if `touse'
-}
-
-*Wide panels
-mata: Y = rowshape(st_data(., "`1'"), `N')
-mata: W = rowshape(st_data(., "`4'"), `N')
-
-tempvar ever_treated unit_row unit_tag
-
-qui bys `2': egen `ever_treated' = max(`4')
-qui egen `unit_row' = group(`2')
-qui egen `unit_tag' = tag(`2')
-
-qui levelsof `unit_row' if `ever_treated' == 1 & `unit_tag' == 1, local(treated_rows)
-local n_treated : word count `treated_rows'
-
-drop `ever_treated' `unit_row' `unit_tag'
-
-if (length("`if'")+length("`in'")>0) {
-    restore
-}
-
-*------------------------------------------------------------------------------*
-* (2) Calculate ATT
-*------------------------------------------------------------------------------*
-*First subsection will be cross-validation code to tune parameters for lambda_unit, lambda_time and lambda_nn if they are not provided.
-
-*CV Placeholder
-
-*Core function will be in this section
-mata: treated_units = strtoreal(tokens(st_local("treated_rows")))'
-if `lambda_unit_set' local lu = `lambda_unit'
-else                 local lu = 0
-
-if `lambda_time_set' local lt = `lambda_time'
-else                 local lt = 0    
-mata: delta = .; delta_unit = .; delta_time = .
-mata: trop_cell_weights(Y, treated_units, `lu', `lt', `treated_periods', ///
-                          delta, delta_unit, delta_time)
-mata: tau_hat = .; mu_hat = .; alpha_hat = .; beta_hat = .
-mata: trop_fit_wls(Y, W, delta, tau_hat, mu_hat, alpha_hat, beta_hat)
-mata: st_local("tau_hat", strofreal(tau_hat))
-
-*--------------------------------------------------------------------------*
-* (3) Standard error: bootstrap
-*--------------------------------------------------------------------------*
-
-*--------------------------------------------------------------------------*
-* (4) Standard error: placebo
-*--------------------------------------------------------------------------*
-
-*--------------------------------------------------------------------------*
-* (5) Return output
-*--------------------------------------------------------------------------*
-ereturn clear
-
-*--------------------------------------------------------------------------*
-* (6) Graphing (Currently no graphs required but can leave this space for later)
-*--------------------------------------------------------------------------*
-
-*------------------------------------------------------------------------------*
-* (7) Stata Subroutines
+* Mata functions
 *------------------------------------------------------------------------------*
 
-*------------------------------------------------------------------------------*
-* (8) Mata functions
-*------------------------------------------------------------------------------*
-cap mata: mata drop trop_cell_weights()
+capture mata: mata drop trop_cell_weights()
+capture mata: mata drop trop_fit_wls()
 
 mata:
-void trop_cell_weights(Y, treated_units, lambda_unit, lambda_time,
-                         treated_periods, delta, delta_unit, delta_time)
+
+void trop_cell_weights(
+    real matrix Y,
+    real colvector treated_units,
+    real scalar lambda_unit,
+    real scalar lambda_time,
+    real scalar treated_periods,
+    real matrix delta,
+    real colvector delta_unit,
+    real rowvector delta_time
+)
 {
-    real scalar N, T, center
+    real scalar N, T, T0, center
     real rowvector dist_time, avg_treated
     real colvector dist_unit, A, B
     real matrix mask, sqdiff
 
-    N = rows(Y)
-    T = cols(Y)
+    N  = rows(Y)
+    T  = cols(Y)
+    T0 = T - treated_periods
 
-    // Time distances (matches Python's 0-based np.arange convention)
+    if (treated_periods <= 0 | treated_periods >= T) {
+        errprintf("treated_periods must be positive and smaller than T.\n")
+        exit(198)
+    }
+
+    if (rows(treated_units) == 0) {
+        errprintf("No treated units supplied to trop_cell_weights().\n")
+        exit(459)
+    }
+
+    /*
+      Time distance.
+
+      This follows the current prototype logic:
+      higher weight around the middle of the treated/post block boundary region.
+      You may later want to replace this with the exact kernel from the TROP paper.
+    */
     center    = T - treated_periods / 2
     dist_time = abs(((1..T) :- 1) :- center)
 
-    // Pre-period mask: 1 in pre, 0 in last treated_periods columns
+    /*
+      Pre-period mask: 1 in pre-treatment columns and 0 in the last
+      treated_periods columns.
+    */
     mask = J(N, T, 1)
-    mask[., (T - treated_periods + 1)..T] = J(N, treated_periods, 0)
+    mask[., (T0 + 1)..T] = J(N, treated_periods, 0)
 
-    // Reference trajectory: column mean over treated-unit rows
+    /*
+      Reference trajectory: average over treated units.
+    */
     avg_treated = mean(Y[treated_units, .])
 
-    // RMS pre-period distance from each unit to the reference
+    /*
+      Unit distance: RMS pre-period distance to the treated reference path.
+    */
     sqdiff    = (J(N, 1, 1) * avg_treated - Y) :^ 2
     A         = rowsum(sqdiff :* mask)
     B         = rowsum(mask)
@@ -268,75 +357,80 @@ void trop_cell_weights(Y, treated_units, lambda_unit, lambda_time,
 
     delta_unit = exp(-lambda_unit :* dist_unit)
     delta_time = exp(-lambda_time :* dist_time)
-    delta      = delta_unit * delta_time
+
+    /*
+      Cell weight matrix: N x T outer product.
+    */
+    delta = delta_unit * delta_time
 }
-end
 
-* ----------------------------------------------------------------------------
-cap mata: mata drop trop_fit_wls()
 
-* trop_fit_wls: weighted two-way fixed effects estimator with treatment.
-*
-* Solves
-*   min_{mu, alpha, beta, tau}
-*     sum_{i,t} (1 - W_it) * delta_it * (Y_it - mu - alpha_i - beta_t - W_it*tau)^2
-*
-* Design matrix is built via Kronecker products:
-*   X = [1_{NT}, (I_{N-1} kron 1_T), (1_N kron I_{T-1}), vec(W')]
-*
-* Unit FE for unit 1 and time FE for time 1 are absorbed into mu (TWFE
-* normalization). Observations are vectorized in row-major order:
-*   row = (i-1)*T + t  for unit i, time t.
-*
-* Inputs
-*   Y     : N x T outcome matrix
-*   W     : N x T binary treatment indicator
-*   delta : N x T weight matrix from trop_weights_pooled
-*
-* Outputs (written through implicit pass-by-reference)
-*   tau   : scalar treatment effect estimate
-*   mu    : scalar intercept
-*   alpha : N x 1 unit fixed effects (alpha[1] = 0 by normalization)
-*   beta  : 1 x T time fixed effects (beta[1] = 0 by normalization)
-
-mata:
-void trop_fit_wls(Y, W, delta, tau, mu, alpha, beta)
+void trop_fit_wls(
+    real matrix Y,
+    real matrix W,
+    real matrix delta,
+    real scalar tau,
+    real scalar mu,
+    real colvector alpha,
+    real rowvector beta
+)
 {
     real scalar N, T, NT, p
-    real colvector y_vec, w_diag, b
+    real colvector y_vec, w_vec, b
     real matrix X, D_unit, D_time, XtWX, XtWy
 
     N  = rows(Y)
     T  = cols(Y)
     NT = N * T
 
-    // Vectorize Y, W, weights in row-major order (unit-then-time stacking).
-    // rowshape(M', 1)' takes a matrix and stacks rows; equivalent to
-    // vec(M') in standard notation.
-    y_vec  = rowshape(Y, NT)
-    w_diag = rowshape((1 :- W) :* delta, NT)
+    /*
+      Row-major vectorization.
 
-    // Unit dummy block: I_{N-1} kron 1_T  (drop unit 1 for normalization)
-    // Result is NT x (N-1).
+      vec(Y') stacks rows of Y, so position (i-1)*T + t corresponds to
+      panel cell (i,t). This matches D_unit and D_time below.
+    */
+    y_vec = vec(Y')
+    w_vec = vec(delta')
+
+    /*
+      Unit fixed effects: I_N without first column, repeated over T periods.
+      Result: NT x (N-1)
+    */
     D_unit = I(N)[., 2..N] # J(T, 1, 1)
 
-    // Time dummy block: 1_N kron I_{T-1}  (drop time 1 for normalization)
-    // Result is NT x (T-1).
+    /*
+      Time fixed effects: I_T without first column, repeated over N units.
+      Result: NT x (T-1)
+    */
     D_time = J(N, 1, 1) # I(T)[., 2..T]
 
-    // Stack design: [intercept, D_unit, D_time, vec(W')]
+    /*
+      Weighted TWFE design:
+      [intercept, unit FE, time FE, treatment]
+    */
     p = 1 + (N - 1) + (T - 1) + 1
-    X = J(NT, 1, 1), D_unit, D_time, rowshape(W, NT)
+    X = J(NT, 1, 1), D_unit, D_time, vec(W')
 
-    // Weighted normal equations
-    XtWX = quadcross(X, w_diag, X)
-    XtWy = quadcross(X, w_diag, y_vec)
-    b    = invsym(XtWX) * XtWy
+    /*
+      Weighted normal equations.
 
-    // Unpack
+      Important: this uses delta as the weight. Do not multiply by (1-W),
+      otherwise all treated observations get zero weight and tau is not identified.
+    */
+    XtWX = quadcross(X, w_vec, X)
+    XtWy = quadcross(X, w_vec, y_vec)
+
+    /*
+      invsym() will return missing columns/rows if the system is singular.
+      In early development, this is useful. For production, consider qrsolve()
+      or pinv() with a clear diagnostic.
+    */
+    b = invsym(XtWX) * XtWy
+
     mu    = b[1]
-    alpha = 0 \ b[2 .. N]                  // alpha[1] = 0
-    beta  = (0, b[N + 1 .. N + T - 1]')    // beta[1]  = 0
+    alpha = 0 \ b[2..N]
+    beta  = (0, b[(N + 1)..(N + T - 1)]')
     tau   = b[p]
 }
+
 end
