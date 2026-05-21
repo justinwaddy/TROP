@@ -211,10 +211,14 @@ else                 local lt = 0
 mata: delta = .; delta_unit = .; delta_time = .
 mata: trop_cell_weights(Y, W, strtoreal(tokens(st_local("treated_rows")))', ///
                         `lu', `lt', delta, delta_unit, delta_time)
-mata: tau_hat = .; mu_hat = .; alpha_hat = .; beta_hat = .
-mata: trop_fit_wls(Y, W, delta, tau_hat, mu_hat, alpha_hat, beta_hat)
+mata: tau_hat = .; mu_hat = .; alpha_hat = .; beta_hat = .; L_hat = .; iters = .
+if `lambda_nn_inf' {
+    mata: trop_fit_wls(Y, W, delta, tau_hat, mu_hat, alpha_hat, beta_hat)
+}
+else {
+    mata: trop_fit_nuclear(Y, W, delta, `lambda_nn', 1e-10, 5000, tau_hat, mu_hat, alpha_hat, beta_hat, L_hat, iters)
+}
 mata: st_local("tau_hat", strofreal(tau_hat))
-
 *--------------------------------------------------------------------------*
 * (3) Standard error: bootstrap
 *--------------------------------------------------------------------------*
@@ -259,6 +263,8 @@ end
 
 cap mata: mata drop trop_cell_weights()
 cap mata: mata drop trop_fit_wls()
+cap mata: mata drop trop_svt()
+cap mata: mata drop trop_fit_nuclear()
 
 mata:
 void trop_cell_weights(
@@ -345,11 +351,106 @@ void trop_fit_wls(
     XtWX = quadcross(X, w_vec, X)
     XtWy = quadcross(X, w_vec, y_vec)
 
-    b = invsym(XtWX) * XtWy
+    b = qrsolve(XtWX, XtWy)
 
     mu    = b[1]
     alpha = 0 \ b[2..N]
     beta  = (0, b[(N + 1)..(N + T - 1)]')
     tau   = b[p]
+}
+end
+
+mata:
+real matrix trop_svt(real matrix Z, real scalar thr)
+{
+    real matrix U, Vt
+    real colvector s, s_thr
+    real scalar r
+
+    fullsvd(Z, U, s, Vt)
+
+    r     = rows(s)
+    s_thr = (s :- thr) :* ((s :- thr) :> 0)
+
+    return( (U[., 1..r] :* s_thr') * Vt[1..r, .] )
+}
+
+mata:
+void trop_fit_nuclear(
+    real matrix Y,
+    real matrix W,
+    real matrix delta,
+    real scalar lambda_nn,
+    real scalar tol,
+    real scalar max_iter,
+    real scalar tau,
+    real scalar mu,
+    real colvector alpha,
+    real rowvector beta,
+    real matrix L,
+    real scalar iters
+)
+{
+    real scalar N, T, NT, p, k, delta_max, Lip, step, thr
+    real scalar t_mom, t_new, change, normL
+    real colvector w_vec, y_vec, b
+    real matrix D_unit, D_time, X, XtWX
+    real matrix Z, L_new, fe, R, grad
+
+    N  = rows(Y)
+    T  = cols(Y)
+    NT = N * T
+
+    D_unit = I(N)[., 2..N] # J(T, 1, 1)
+    D_time = J(N, 1, 1) # I(T)[., 2..T]
+
+    p = 1 + (N - 1) + (T - 1) + 1
+    X = J(NT, 1, 1), D_unit, D_time, vec(W')
+
+    w_vec = vec(delta')
+    XtWX  = quadcross(X, w_vec, X)
+
+    delta_max = max(delta)
+    if (delta_max <= 0) {
+        errprintf("All delta weights are zero.\n")
+        exit(498)
+    }
+
+    Lip  = 2 * delta_max
+    step = 1 / Lip
+    thr  = lambda_nn / Lip
+
+    L     = J(N, T, 0)
+    Z     = L
+    t_mom = 1
+
+    for (k = 1; k <= max_iter; k++) {
+        y_vec = vec((Y - Z)')
+
+        b  = qrsolve(XtWX, quadcross(X, w_vec, y_vec))
+        fe = rowshape(X * b, N)
+
+        tau = b[p]
+
+        R     = Y - fe
+        grad  = -2 :* delta :* (R - Z)
+        L_new = trop_svt(Z - step :* grad, thr)
+
+        t_new = (1 + sqrt(1 + 4 * t_mom^2)) / 2
+        Z     = L_new + ((t_mom - 1) / t_new) :* (L_new - L)
+
+        normL  = sqrt(sum(L_new :^ 2))
+        change = sqrt(sum((L_new - L) :^ 2))
+
+        L     = L_new
+        t_mom = t_new
+
+        if (change <= tol * max((1, normL))) break
+    }
+
+    mu    = b[1]
+    alpha = 0 \ b[2..N]
+    beta  = (0, b[(N + 1)..(N + T - 1)]')
+    iters = min((k, max_iter))
 }
 end
