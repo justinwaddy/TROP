@@ -311,6 +311,7 @@ void trop_cell_weights(
 
     delta = delta_unit * delta_time
 }
+end
 
 mata:
 void trop_fit_wls(
