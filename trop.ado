@@ -332,48 +332,19 @@ void trop_fit_wls(
     T  = cols(Y)
     NT = N * T
 
-    /*
-      Row-major vectorization.
-
-      vec(Y') stacks rows of Y, so position (i-1)*T + t corresponds to
-      panel cell (i,t). This matches D_unit and D_time below.
-    */
     y_vec = vec(Y')
     w_vec = vec(delta')
 
-    /*
-      Unit fixed effects: I_N without first column, repeated over T periods.
-      Result: NT x (N-1)
-    */
     D_unit = I(N)[., 2..N] # J(T, 1, 1)
 
-    /*
-      Time fixed effects: I_T without first column, repeated over N units.
-      Result: NT x (T-1)
-    */
     D_time = J(N, 1, 1) # I(T)[., 2..T]
 
-    /*
-      Weighted TWFE design:
-      [intercept, unit FE, time FE, treatment]
-    */
     p = 1 + (N - 1) + (T - 1) + 1
     X = J(NT, 1, 1), D_unit, D_time, vec(W')
 
-    /*
-      Weighted normal equations.
-
-      Important: this uses delta as the weight. Do not multiply by (1-W),
-      otherwise all treated observations get zero weight and tau is not identified.
-    */
     XtWX = quadcross(X, w_vec, X)
     XtWy = quadcross(X, w_vec, y_vec)
 
-    /*
-      invsym() will return missing columns/rows if the system is singular.
-      In early development, this is useful. For production, consider qrsolve()
-      or pinv() with a clear diagnostic.
-    */
     b = invsym(XtWX) * XtWy
 
     mu    = b[1]
