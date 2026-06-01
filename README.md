@@ -51,7 +51,9 @@ $$\omega_j^{i,t}(\lambda) = \exp\left(-\lambda_\text{unit} \cdot \left(\frac{\su
 We provide tuning options `cv(resample)` and `cv(kfold)`, which use placebo cross-validation as described in the [TROP Python Tutorial](https://github.com/ostasovskyi/TROP-Estimator/blob/main/notebooks/tutorial.ipynb). The idea is to assign the observed treatment pattern of treated units to a set of control units. The set of control units can either be chosen under `CV(resample)` which draws `ntrials` random control samples, or `CV(k-fold)` which partitions the controls into K folds.
 
 Any lambda left unspecified is chosen by placebo cross-validation, which uses the fact that the estimated effect on a control unit permuted as if it were treated should be near zero. Using only the never-treated units, `trop` assigns the treated time pattern to a set of control units, estimates a placebo $\tau$, and scores a lambda triplet by the root-mean-square of the placebo estimates, 
+
 $$Q(\lambda) = \sqrt{\tfrac{1}{J}\sum_j \hat\tau_j^\text{placebo}(\lambda)^2}$$ 
+
 The placebo sets are drawn once and reused for every lambda on the grid. The sampling method is either `resample` (default), which draws `ntrials` random placebo sets each treating `ntreated` control units, or `kfold` which partitions the controls into `kfold` folds, each treated once. The search is either `cycle` (default), coordinate descent over the three lambdas in turn, or `joint`, an exhaustive grid search. Fixing any subset of lambdas directly via the options leaves only the remaining lambdas to be cross-validated.
 
 ## Inputs
