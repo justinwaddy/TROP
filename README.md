@@ -22,13 +22,11 @@ where $\alpha_i$ and $\beta_t$ are unit and time fixed effects, and $\mathbf{L}$
 
 ### The Estimator
 
-For a treated unit–period pair $(i^{\*}, t^{\*})$, TROP jointly estimates fixed effects and the low-rank component by solving a **doubly-weighted nuclear-norm penalized regression** over all control observations:
+For a treated unit–period pair $(i^{\*}, t^{\*})$, TROP jointly estimates fixed effects and the low-rank component by solving a **doubly-weighted nuclear-norm penalized regression** over all control observations. For each unit $(i,t)$, TROP constructs the estimator
 
-$$(\hat\alpha, \hat\beta, \hat{\mathbf{L}}) = \underset{\alpha,\beta,\mathbf{L}}{\text{arg min}} \sum_{j,s} \theta_s^{i,t}\,\omega_j^{i,t}(1 - W_{js})\bigl(Y_{js} - \alpha_j - \beta_s - L_{js}\bigr)^2 + \lambda_{nn}\|\mathbf{L}\|_*$$
+$$\hat\tau_{it}(\lambda) = \underset{\tau_{i,t}}{\arg\min}\ \min_{\alpha,\beta,L}\ \sum_{j=1}^{N}\sum_{s=1}^{T} \bigl[(1-W_{j,s}) + W_{j,s}\,I^{i,t}_{j,s}\bigr]\\omega^{i,t}_j(\lambda)\\theta^{i,t}_s(\lambda)\\bigl(Y_{js}-\alpha_j-\beta_s-L_{js}-\tau_{i,t}\cdot I^{i,t}_{j,s}\bigr)^2 + \lambda_{nn}\lVert L\rVert$$
 
-The treatment effect estimate is then:
-
-$$\hat\tau_{it} = Y_{it} - \hat\alpha_i - \hat\beta_t - \hat{\mathbf{L}}_{it}$$
+where $I_{j,s}^{i,t}$ is equal to 1 when $(j,s) = (i,t)$, and 0 otherwise. For a given target cell $(i,t)$, the estimator recovers its treatment effect as if it were the only treated unit. In other words, the front term $[(1-W_{j,s}) + W_{j,s} I^{i,t}_{j,s}]$ zero-weights every other treated cell, and $\tau\_{i,t}\cdot I^{i,t}\_{j,s}$ recovers the treatment effect for only the given target unit. This generalises the estimator to treated and _untreated (placebo) units_. 
 
 This formulation nests existing estimators as special cases, and these can be requested with arguments in `trop`:
 - **DID/TWFE**: $\lambda_{nn} = \infty$, uniform weights $\omega_j = \theta_s = 1$
@@ -49,11 +47,11 @@ $$\omega_j^{i,t}(\lambda) = \exp\left(-\lambda_\text{unit} \cdot \left(\frac{\su
 
 ### Tuning via Leave-One-Out Cross-Validation
 
-The triplet $(\lambda_\text{time}, \lambda_\text{unit}, \lambda_{nn})$ is chosen by a **leave-one-out cross-validation (LOOCV)** criterion that exploits the fact that the estimated treatment effect on any control unit---permuted as if it were the true treated unit---should be close to zero. Formally, TROP minimizes:
+By default, the triplet $(\lambda_\text{time}, \lambda_\text{unit}, \lambda_{nn})$ is chosen by a **leave-one-out cross-validation (LOOCV)** criterion that exploits the fact that the estimated treatment effect on any control unit---permuted as if it were the true treated unit---should be close to zero. Formally, TROP minimizes:
 
 $$Q(\lambda) = \sum_{i,t} (1 - W_{it})\,\bigl(\hat\tau_{it}^\text{loocv}(\lambda)\bigr)^2$$
 
-over a grid, cycling through the three parameters in sequence. 
+over a grid, cycling through the three parameters in sequence. We also provide alternative tuning options `cv(resample)` and `cv(kfold)`, which use placebo cross-validation as described in the [TROP Python Tutorial](https://github.com/ostasovskyi/TROP-Estimator/blob/main/notebooks/tutorial.ipynb). The idea is to assign the observed treatment pattern of treated units to a set of control units. The set of control units can either be chosen under `CV(resample)' which draws `ntrials' random control samples, or CV(k-fold) which partitions the controls into K folds.
 
 ## Syntax
 ```s
