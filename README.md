@@ -90,8 +90,75 @@ trop Y S T D [if] [in] [, group(type) lambda_unit(#) lambda_time(#) lambda_nn(#)
 + level(): confidence level for the reported interval (default 95).
 + verbose: display cross-validation and bootstrap progress.
 
-## Examples
+## Grouping Estimands: Time-block grouping under `group(time)`
 
+By default (`group(cell)`) TROP estimates a separate effect for every treated unit-time cell and averages them. With `group(time)`, treated cells that share the **same contiguous treatment spell** are pooled into a single timing block, one effect is estimated per block, and the blocks are averaged using their treated-cell counts. For example, simultaneous adoption which switches on permanently results in one estimand for $\tau$.
+
+For each unit, find its uninterrupted runs of treated periods. Two runs belong to the same block $g$ if they have identical start and end dates $(a_g, b_g)$. The block is the set of treated cells covered by that timing:
+
+```math
+\mathcal{D}_g = \{(i,t) \mid t \in [a_g, b_g],\; W_{it} = 1\}.
+```
+
+Each block replaces the cell indicator with a block indicator $I^g_{js} = 1\{(j,s)\in\mathcal{D}_g\}$ and solves
+
+```math
+\widehat{\tau}_g(\lambda)
+= \arg\min_{\tau_g}\,\min_{\alpha,\beta,L}
+\sum_{j,s}
+\bigl[(1-W_{js}) + W_{js}I^g_{js}\bigr]\,
+\omega^g_j\,\theta^g_s\,
+\bigl(Y_{js} - \alpha_j - \beta_s - L_{js} - \tau_g I^g_{js}\bigr)^2
++ \lambda_{nn}\lVert L\rVert_*.
+```
+
+The weight $(1-W_{js}) + W_{js}I^g_{js}$ keeps every untreated cell and the treated cells in block $g$, while zero-weighting treated cells from other blocks — so each block is estimated as if it were the only treated block. The grouped ATT is the treated-cell-weighted average of the block effects:
+
+```math
+\widehat{\tau}_{\mathrm{time}}
+= \sum_{g=1}^{G} \pi_g\,\widehat{\tau}_g,
+\qquad
+\pi_g = \frac{|\mathcal{D}_g|}{|\mathcal{D}|}.
+```
+
+#### Example
+
+```math
+W =
+\begin{array}{c|cccccc}
+ & t{=}1 & t{=}2 & t{=}3 & t{=}4 & t{=}5 & t{=}6 \\
+i{=}1 & 0 & 0 & 1 & 1 & 0 & 0 \\
+i{=}2 & 0 & 0 & 1 & 1 & 0 & 0 \\
+i{=}3 & 0 & 0 & 0 & 1 & 1 & 1 \\
+i{=}4 & 0 & 1 & 1 & 0 & 1 & 1 \\
+i{=}5 & 0 & 0 & 0 & 0 & 0 & 0
+\end{array}
+```
+
+- `group(cell)`: 11 separate effects, one per treated cell, averaged equally.
+- `group(time)`: contiguous spells are `{3,4}` for units 1 and 2 (identical, so pooled), `{4,5,6}` for unit 3, and `{2,3}` plus `{5,6}` for unit 4 — giving four blocks of sizes 4, 3, 2, 2:
+
+```math
+G =
+\begin{array}{c|cccccc}
+ & t{=}1 & t{=}2 & t{=}3 & t{=}4 & t{=}5 & t{=}6 \\
+i{=}1 & 0 & 0 & 1 & 1 & 0 & 0 \\
+i{=}2 & 0 & 0 & 1 & 1 & 0 & 0 \\
+i{=}3 & 0 & 0 & 0 & 2 & 2 & 2 \\
+i{=}4 & 0 & 3 & 3 & 0 & 4 & 4 \\
+i{=}5 & 0 & 0 & 0 & 0 & 0 & 0
+\end{array}
+```
+
+```math
+\widehat{\tau}_{\mathrm{time}}
+= \frac{4\widehat{\tau}_1 + 3\widehat{\tau}_2 + 2\widehat{\tau}_3 + 2\widehat{\tau}_4}{11}.
+```
+
+**In short:** `group(cell)` estimates one effect per treated cell; `group(time)` estimates one effect per shared contiguous treatment spell, then averages by treated-cell count.
+
+
+## Examples
 
 ## References
 Abadie, A., Diamond, A., & Hainmueller, J. (2010). [Synthetic control methods for comparative case studies: Estimating the effect of California's tobacco control program](https://doi.org/10.1198/jasa.2009.ap08746). *Journal of the American Statistical Association*, 105(490), 493–505.
