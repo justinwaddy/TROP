@@ -27,7 +27,7 @@ where $\alpha_i$ and $\beta_t$ are unit and time fixed effects, and $\mathbf{L}$
 
 TROP jointly estimates fixed effects and the low-rank component by solving a **doubly-weighted nuclear-norm penalized regression** over all control observations. The existing version implements a blocked variant of TROP, under which $\tau$ is estimated across block treatment in $W\_{i,t}$
 
-$$(\hat\tau,\hat\mu,\hat\alpha,\hat\beta,\hat{L}) = \arg\min_{\tau,\mu,\alpha,\beta,L}\ \sum_{j=1}^{N}\sum_{s=1}^{T} \delta_{js}\bigl(Y_{js} - \mu - \alpha_j - \beta_s - L_{js} - \tauW_{js}\bigr)^2 + \lambda_{nn}\lVert L\rVert_*,$$
+$$(\hat\tau,\hat\mu,\hat\alpha,\hat\beta,\hat{L}) = \arg\min_{\tau,\mu,\alpha,\beta,L}\ \sum_{j=1}^{N}\sum_{s=1}^{T} \delta_{js}\bigl(Y_{js} - \mu - \alpha_j - \beta_s - L_{js} - \tau W_{js}\bigr)^2 + \lambda_{nn}\lVert L\rVert_*,$$
 
 with $\delta_{js} = \omega_j\,\theta_s$ the outer product of unit weights $\omega$ and time weights $\theta$. 
 
