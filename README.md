@@ -70,7 +70,7 @@ trop Y S T D [if] [in], group(type) lambda_unit(#) lambda_time(#) lambda_nn(#)
                         nn_grid(string) ntrials(#) kfold(#) ntreated(#) cv_seed(#)
                         vce(method) reps(#) seed(#) level(#) verbose
 ```
-+ group(): **cell**, **time** or **unit**. Sets how treated cells are grouped into estimands. **cell** (default) treats every treated cell as its own target and reports the cell-count-weighted average of the per-cell effects (paper Eq. 1). **time** groups treatment effects across cells which share the same treatment timing, similair to staggered adoption except treatment can switch on and off. **unit** groups each unit's treated cells into one target for that unit.
++ group(): **cell**, or **time**. Sets how treated unit-time cells are grouped into estimands. **cell** (default) treats every unit-time cell as its own target and reports the cell-count-weighted average of the per-cell effects (paper Eq. 1). **time** groups estimands across cells which have adjacent treated time periods, and further groups treatment (blocks) across units which share the same treatment timing. 
 + vce(): **bootstrap** (default) for stratified block-bootstrap standard errors. If you want to omit this procedure use **noinference**.
 + lambda_unit(): tuning parameter for unit weights $\omega_j$. Larger values concentrate weight on control units whose pre-treatment paths most resemble the treated unit; 0 weights all units equally. If omitted, chosen by cross-validation.
 + lambda_time(): tuning parameter for time weights $\theta_s$. Larger values concentrate weight on periods near treatment; 0 weights all periods equally. If omitted, chosen by cross-validation.
