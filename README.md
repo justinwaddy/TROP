@@ -119,36 +119,37 @@ which returns
  
 Turning on both weight dimensions gives weighted two-way fixed effects:
 ```s
-trop y unit time w, lambda_unit(0.5) lambda_time(0.5) lambda_nn(inf) vce(noinference)
+trop y unit time w, lambda_unit(0.3) lambda_time(0.325) lambda_nn(0.016) vce(noinference)
 ```
 which returns
 ```
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
-         ATT |     0.03816
+         ATT |     0.04573
              |  (no inference; vce(noinference))
 -------------+--------------------------------------------------
      N units |         111
    T periods |          48
    N treated |          29
 -------------+--------------------------------------------------
- lambda_unit |      0.5000
- lambda_time |      0.5000
-   lambda_nn |         inf
+ lambda_unit |      0.3000
+ lambda_time |      0.3250
+   lambda_nn |        .016
 ----------------------------------------------------------------
+
 ```
  
-Equal weights with a finite nuclear penalty isolate the low-rank (FISTA) path, i.e. matrix completion:
+No weights with a finite nuclear penalty i.e. matrix completion:
 ```s
-trop y unit time w, lambda_unit(0) lambda_time(0) lambda_nn(0.1) vce(noinference)
+trop y unit time w, lambda_unit(0) lambda_time(0) lambda_nn(0.6) vce(noinference)
 ```
 which returns
 ```
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
-         ATT |     0.05857
+         ATT |     0.06312
              |  (no inference; vce(noinference))
 -------------+--------------------------------------------------
      N units |         111
@@ -157,7 +158,7 @@ which returns
 -------------+--------------------------------------------------
  lambda_unit |      0.0000
  lambda_time |      0.0000
-   lambda_nn |          .1
+   lambda_nn |          .6
 ----------------------------------------------------------------
 ```
 
