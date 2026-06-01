@@ -13,7 +13,7 @@ TROP operates on an $N \times T$ panel of outcomes $\mathbf{Y}$ and binary treat
 
 $$\tau = \frac{\sum_{i,t} W_{it}\bigl(Y_{it}(1) - Y_{it}(0)\bigr)}{\sum_{i,t} W_{it}}$$
 
-Unlike [SC](https://www.mit.edu/~jhainm/synthpage.html) ([Abadie et al., 2010](#references)) and [SDID](https://github.com/Daniel-Pailanir/sdid) ([Arkhangelsky et al., 2021](#references)), TROP accommodates **general assignment patterns** in which units can move into and out of treatment, and there is no requirement of staggered adoption. Note this package requires simulatenous treatment adoption, but future implementations will implement general assignment patterns.
+Unlike [SC](https://www.mit.edu/~jhainm/synthpage.html) ([Abadie et al., 2010](#references)) and [SDID](https://github.com/Daniel-Pailanir/sdid) ([Arkhangelsky et al., 2021](#references)), TROP accommodates general assignment patterns in which units can move into and out of treatment, and there is no requirement of staggered adoption. **Note this package requires simulatenous treatment adoption, but future implementations will implement a general assignment pattern.**
 
 ### The Outcome Model
 
