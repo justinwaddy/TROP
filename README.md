@@ -65,26 +65,28 @@ The panel must be balanced, with no missing values in Y or D. Treatment may foll
 
 ## Syntax
 ```s
-trop Y S T D [if] [in], group(type) lambda_unit(#) lambda_time(#) lambda_nn(#)
-                        cv(method [search]) unit_grid(numlist) time_grid(numlist)
-                        nn_grid(string) ntrials(#) kfold(#) ntreated(#) cv_seed(#)
-                        vce(method) reps(#) seed(#) level(#) verbose
+trop Y S T D [if] [in] [, group(type) lambda_unit(#) lambda_time(#) lambda_nn(#)
+                          cv(method [search] [, suboptions])
+                          vce(vcetype [, reps(#) seed(#)]) level(#) verbose ]
 ```
-+ group(): **cell**, or **time**. Determines how treated unit-time cells are grouped into estimands. **cell** (default) treats every unit-time cell as its own target and reports the ATT by aggregating per-cell effects (paper Eq. 1). **time** groups estimands across cells which have adjacent treated time periods for a given unit, and further groups treatment (blocks) across units which share the same treatment timing.
-+ vce(): **bootstrap** (default) for stratified block-bootstrap standard errors. If you want to omit this procedure use **noinference**.
++ group(): **cell**, or **time**. Determines how treated unit-time cells are grouped into estimands. **cell** (default) treats every unit-time cell as its own target and reports the ATT by aggregating per-cell effects (paper Eq. 1). **time** groups estimands across adjacent treated periods for a given unit, and further groups treatment (blocks) across units which share the same treatment timing.
 + lambda_unit(): tuning parameter for unit weights $\omega_j$. Larger values concentrate weight on control units whose pre-treatment paths most resemble the treated unit; 0 weights all units equally. If omitted, chosen by cross-validation.
 + lambda_time(): tuning parameter for time weights $\theta_s$. Larger values concentrate weight on periods near treatment; 0 weights all periods equally. If omitted, chosen by cross-validation.
-+ lambda_nn(): tuning parameter for nuclear-norm penalty on the low-rank component $\mathbf{L}$. Larger values shrink $\mathbf{L}$ toward low rank; **inf** (or **.**) drops $\mathbf{L}$, reducing TROP to weighted two-way fixed effects. If omitted, chosen by cross-validation.
-+ cv(): cross-validation scheme. The first word is the method, the second is the search type. For the method, **loocv** (default) for leave-one-out cross-validation, or **resample**/**kfold** for placebo CV on the control panel. The optional second word is the search type: **cycle** (default) for coordinate descent, or **joint** for a full grid search. E.g. cv(loocv joint), cv(resample).
-+ unit_grid(): grid of candidate lambda_unit values searched during cross-validation. Default is 0 0.1 0.2 0.3 0.5 0.8 1.2 1.6 2.
-+ time_grid(): grid of candidate lambda_time values searched during cross-validation. Default is 0 0.025 0.05 0.1 0.2 0.35 0.5 0.75 1 2 4.
-+ nn_grid(): grid of candidate lambda_nn values searched during cross-validation; may include . for the no-L (TWFE) case. Default is 0.005 0.01 0.025 0.05 0.1 0.25 0.5 1 .
-+ ntrials(): number of cross-validation placebo draws (default 200) for placebo samples under cv(resample).
-+ kfold(): number of folds for cv(kfold) (default 5) under cv(resample)
-+ ntreated(): number of control units assigned placebo treatment in each cv(resample) draw (default 1). Ignored unless cv(resample) is used; set it near your number of actually-treated units so the placebo mimics the real treated-group size.
-+ cv_seed(): seed for the cross-validation placebo draws (default 0), for reproducibility.
-+ reps(): repetitions for the bootstrap standard errors (default 200).
-+ seed(): seed for the bootstrap draws.
++ lambda_nn(): tuning parameter for the nuclear-norm penalty on the low-rank component $\mathbf{L}$. Larger values shrink $\mathbf{L}$ toward low rank; **inf** (or **.**) drops $\mathbf{L}$, reducing TROP to weighted two-way fixed effects. If omitted, chosen by cross-validation.
++ cv(method [search] [, suboptions]): cross-validation scheme used to choose any lambda left unspecified. The first word is the method, the optional second word is the search type, and tuning knobs follow a comma.
+  - *method*: **loocv** (default) leave-one-out, holding out each control observation in turn; **resample** random placebo-treated sets drawn from the control panel; **kfold** controls partitioned into folds, each treated once.
+  - *search*: **cycle** (default) coordinate descent; **joint** full grid search.
+  - *suboptions*:
+    - trials(#): placebo draws under **resample** (default 200; ignored otherwise).
+    - ntreated(#): placebo-treated units per **resample** draw (default 1); set near your number of actually-treated units so the placebo mimics the real treated-group size.
+    - folds(#): number of folds under **kfold** (default 5; ignored otherwise).
+    - seed(#): seed for the **resample** and **kfold** draws (default 0). Has no effect under **loocv**, which is deterministic.
+    - unit_grid(numlist): candidate $\lambda_\text{unit}$ values. Default `0 0.1 0.2 0.3 0.5 0.8 1.2 1.6 2`.
+    - time_grid(numlist): candidate $\lambda_\text{time}$ values. Default `0 0.025 0.05 0.1 0.2 0.35 0.5 0.75 1 2 4`.
+    - nn_grid(string): candidate $\lambda_{nn}$ values; may include **.** for the no-$\mathbf{L}$ (TWFE) case. Default `0.005 0.01 0.025 0.05 0.1 0.25 0.5 1 .`.
+
+  E.g. `cv(loocv joint)`, `cv(resample, trials(500) ntreated(10))`, `cv(kfold, folds(10))`, `cv(loocv, nn_grid(0.01 0.1 1 .) unit_grid(0 0.5 1))`.
++ vce(vcetype [, reps(#) seed(#)]): **bootstrap** (default) for stratified block-bootstrap standard errors, or **noinference** to skip inference. reps() sets bootstrap repetitions (default 200); seed() sets the bootstrap seed.
 + level(): confidence level for the reported interval (default 95).
 + verbose: display cross-validation and bootstrap progress.
 
