@@ -91,7 +91,7 @@ trop Y S T D [if] [in] [, lambda_unit(#) lambda_time(#) lambda_nn(#)
 + verbose: display cross-validation and bootstrap progress.
 
 ## Examples
-The examples use the long-form panels shipped with the package (`trop_panel_penn.csv` and `trop_panel_synthetic.csv`), each with columns `unit time y w`. Load and `xtset` first:
+The examples use the long-form panel in the repository (`trop_panel_penn.csv`), each with columns `unit time y w`. Load and `xtset` first:
 ```s
 import delimited "trop_panel_penn.csv", varnames(1) clear
 xtset unit time
