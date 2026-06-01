@@ -119,7 +119,7 @@ which returns
 ----------------------------------------------------------------
 ```
  
-Turning on both weight dimensions gives weighted two-way fixed effects:
+Turning on both unit and time weight dimensions and low-rank adjustment
 ```s
 trop y unit time w, lambda_unit(0.3) lambda_time(0.325) lambda_nn(0.016) vce(noinference)
 ```
@@ -142,7 +142,7 @@ which returns
 
 ```
  
-No weights with a finite nuclear penalty i.e. matrix completion:
+No distance weights with a nuclear penalty i.e. matrix completion:
 ```s
 trop y unit time w, lambda_unit(0) lambda_time(0) lambda_nn(0.6) vce(noinference)
 ```
