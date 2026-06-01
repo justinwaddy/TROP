@@ -80,7 +80,7 @@ trop Y S T D [if] [in] [, group(type) lambda_unit(#) lambda_time(#) lambda_nn(#)
     - trials(#): placebo draws under **resample** (default 200; ignored otherwise).
     - ntreated(#): placebo-treated units per **resample** draw (default 1); set near your number of actually-treated units so the placebo mimics the real treated-group size.
     - folds(#): number of folds under **kfold** (default 5; ignored otherwise).
-    - seed(#): seed for the **resample** and **kfold** draws (default 0). Has no effect under **loocv**, which is deterministic.
+    - seed(#): seed under **resample** and **kfold** draws (default 0). Has no effect under loocv, which is deterministic.
     - unit_grid(numlist): candidate $\lambda_\text{unit}$ values. Default `0 0.1 0.2 0.3 0.5 0.8 1.2 1.6 2`.
     - time_grid(numlist): candidate $\lambda_\text{time}$ values. Default `0 0.025 0.05 0.1 0.2 0.35 0.5 0.75 1 2 4`.
     - nn_grid(string): candidate $\lambda_{nn}$ values; may include **.** for the no-$\mathbf{L}$ (TWFE) case. Default `0.005 0.01 0.025 0.05 0.1 0.25 0.5 1 .`.
