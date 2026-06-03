@@ -69,7 +69,7 @@ trop Y S T D [if] [in] [, group(type) lambda_unit(#) lambda_time(#) lambda_nn(#)
                           cv(method [search] [, suboptions])
                           vce(vcetype [, reps(#) seed(#)]) level(#) verbose ]
 ```
-+ group(): **cell**, or **time**. Determines how treated unit-time cells are grouped into estimands. **cell** (default) treats every unit-time cell as its own target and reports the ATT by aggregating per-cell effects (paper Eq. 1). **time** groups estimands across adjacent treated periods for a given unit, and further groups treatment (blocks) across units which share the same treatment timing.
++ group(): **cell**, or **time**. Determines how treated unit-time cells are grouped into estimands. **cell** (default) treats every unit-time cell as its own target and reports the ATT by aggregating per-cell effects (paper Eq. 1). **time** groups estimands across adjacent treated periods for a given unit into blocks, and further groups these blocks across units which share the same treatment timing. For example, simultaneous adoption which switches on permanently results in one estimand for $\tau$, and staggered adoption results in as many treatment effects as there are adoption cohorts as usual.  
 + lambda_unit(): tuning parameter for unit weights $\omega_j$. Larger values concentrate weight on control units whose pre-treatment paths most resemble the treated unit; 0 weights all units equally. If omitted, chosen by cross-validation.
 + lambda_time(): tuning parameter for time weights $\theta_s$. Larger values concentrate weight on periods near treatment; 0 weights all periods equally. If omitted, chosen by cross-validation.
 + lambda_nn(): tuning parameter for the nuclear-norm penalty on the low-rank component $\mathbf{L}$. Larger values shrink $\mathbf{L}$ toward low rank; **inf** (or **.**) drops $\mathbf{L}$, reducing TROP to weighted two-way fixed effects. If omitted, chosen by cross-validation.
@@ -92,9 +92,9 @@ trop Y S T D [if] [in] [, group(type) lambda_unit(#) lambda_time(#) lambda_nn(#)
 
 ## Grouping Estimands: Time-block grouping under `group(time)`
 
-By default (`group(cell)`) TROP estimates a separate effect for every treated unit-time cell and averages them. With `group(time)`, treated cells that share the **same contiguous treatment spell** are pooled into a single timing block, one effect is estimated per block, and the blocks are averaged using their treated-cell counts. For example, simultaneous adoption which switches on permanently results in one estimand for $\tau$.
+By default (`group(cell)`) TROP estimates a separate effect for every treated unit-time cell and averages them. With `group(time)`, treated cells that share the **same uninterrupted treatment period** are pooled into a single block, one effect is estimated per block, and the treatment effect of blocks is averaged. For example, simultaneous adoption which switches on permanently results in one estimand for $\tau$, and staggered adoption result in as many groups as there are adoption cohorts as usual.  
 
-For each unit, find its uninterrupted runs of treated periods. Two runs belong to the same block $g$ if they have identical start and end dates $(a_g, b_g)$. The block is the set of treated cells covered by that timing:
+For each unit, find its uninterrupted groups of treated periods. Two runs belong to the same treatment block cohort $g$ if they have identical start and end dates $(a_g, b_g)$. The block is the set of treated cells covered by that timing:
 
 ```math
 \mathcal{D}_g = \{(i,t) \mid t \in [a_g, b_g],\; W_{it} = 1\}.
@@ -112,7 +112,7 @@ Each block replaces the cell indicator with a block indicator $I^g_{js} = 1\{(j,
 + \lambda_{nn}\lVert L\rVert_*.
 ```
 
-The weight $(1-W_{js}) + W_{js}I^g_{js}$ keeps every untreated cell and the treated cells in block $g$, while zero-weighting treated cells from other blocks — so each block is estimated as if it were the only treated block. The grouped ATT is the treated-cell-weighted average of the block effects:
+The weight $(1-W_{js}) + W_{js}I^g_{js}$ keeps every untreated cell and the treated cells in block $g$, while zero-weighting treated cells from other blocks, so each block is estimated as if it were the only treated block. The grouped ATT is the treated-cell-weighted average of the block effects:
 
 ```math
 \widehat{\tau}_{\mathrm{time}}
@@ -155,8 +155,7 @@ i{=}5 & 0 & 0 & 0 & 0 & 0 & 0
 = \frac{4\widehat{\tau}_1 + 3\widehat{\tau}_2 + 2\widehat{\tau}_3 + 2\widehat{\tau}_4}{11}.
 ```
 
-**In short:** `group(cell)` estimates one effect per treated cell; `group(time)` estimates one effect per shared contiguous treatment spell, then averages by treated-cell count.
-
+**In short:** `group(cell)` estimates one effect per treated cell; `group(time)` estimates one effect per shared-uninterrupted treatment spell, then averages by treated-cell count.
 
 ## Examples
 
