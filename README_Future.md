@@ -159,6 +159,126 @@ i{=}5 & 0 & 0 & 0 & 0 & 0 & 0
 
 ## Examples
 
+The examples use the long-form panel in the repository (`trop_panel_penn.csv`), with columns `unit time y w`. Load and `xtset` first:
+
+```s
+import delimited "trop_panel_penn.csv", varnames(1) clear
+xtset unit time
+```
+
+With all three regularizers off, TROP reduces to textbook DID/TWFE:
+
+```s
+trop y unit time w, lambda_unit(0) lambda_time(0) lambda_nn(inf) vce(noinference)
+```
+
+which returns
+
+```
+----------------------------------------------------------------
+        TROP |  Triply Robust Panel estimator
+-------------+--------------------------------------------------
+         ATT |     0.22172
+             |  (no inference; vce(noinference))
+-------------+--------------------------------------------------
+     N units |         111
+   T periods |          48
+   N treated |          29
+-------------+--------------------------------------------------
+ lambda_unit |      0.0000
+ lambda_time |      0.0000
+   lambda_nn |         inf
+----------------------------------------------------------------
+```
+No distance weights with a nuclear penalty i.e. matrix completion:
+
+```s
+trop y unit time w, lambda_unit(0) lambda_time(0) lambda_nn(0.6) vce(noinference)
+```
+
+which returns
+
+```
+----------------------------------------------------------------
+        TROP |  Triply Robust Panel estimator
+-------------+--------------------------------------------------
+         ATT |     0.06633
+             |  (no inference; vce(noinference))
+-------------+--------------------------------------------------
+     N units |         111
+   T periods |          48
+   N treated |          29
+-------------+--------------------------------------------------
+ lambda_unit |      0.0000
+ lambda_time |      0.0000
+   lambda_nn |          .6
+----------------------------------------------------------------
+```
+
+Turning on both unit and time weight dimensions AND low-rank adjustment
+
+```s
+trop y unit time w, lambda_unit(0.3) lambda_time(0.325) lambda_nn(0.1) vce(noinference)
+```
+
+which returns
+
+```
+----------------------------------------------------------------
+        TROP |  Triply Robust Panel estimator
+-------------+--------------------------------------------------
+         ATT |     0.03749
+             |  (no inference; vce(noinference))
+-------------+--------------------------------------------------
+     N units |         111
+   T periods |          48
+   N treated |          29
+-------------+--------------------------------------------------
+ lambda_unit |      0.3000
+ lambda_time |      0.3250
+   lambda_nn |          .1
+----------------------------------------------------------------
+```
+
+The estimate changes a lot across these specifications: unadjusted TWFE assigns the
+entire treated/control gap to the effect (0.222), while the weighted and low-rank
+variants attribute much of it to latent factor structure (0.04–0.06).
+
+### Choosing tuning parameters via cross-validation
+
+If you leave any `lambda_*` unspecified, TROP selects it via leave-one-out
+cross-validation by default. loocv is deterministic, unlike resample and
+k-fold:
+
+```s
+trop y unit time w, cv(loocv) vce(noinference)
+```
+
+which returns (loocv tuning takes ~6 min)
+
+```
+
+```
+
+`cv(resample, trials() ntreated() seed())` and `cv(kfold, folds() seed())` are
+stochastic alternatives; set a seed for reproducibility.
+
+### Inference
+
+A stratified block bootstrap gives a standard error and a percentile confidence
+interval. Tune once and bootstrap at the selected regularizers (rather than
+re-tuning inside every replication):
+
+```s
+trop y unit time w, group(time) lambda_unit(0) lambda_time(1) lambda_nn(0.1)
+```
+
+which returns
+
+```
+
+```
+
 ## References
 Abadie, A., Diamond, A., & Hainmueller, J. (2010). [Synthetic control methods for comparative case studies: Estimating the effect of California's tobacco control program](https://doi.org/10.1198/jasa.2009.ap08746). *Journal of the American Statistical Association*, 105(490), 493–505.
 
