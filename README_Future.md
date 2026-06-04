@@ -257,7 +257,21 @@ trop y unit time w, cv(loocv) vce(noinference)
 which returns (loocv tuning takes ~6 min)
 
 ```
-
+----------------------------------------------------------------
+        TROP |  Triply Robust Panel estimator
+-------------+--------------------------------------------------
+         ATT |     0.02644
+             |  (no inference; vce(noinference))
+-------------+--------------------------------------------------
+     N units |         111
+   T periods |          48
+   N treated |          29
+-------------+--------------------------------------------------
+ lambda_unit |      0.0000
+ lambda_time |      0.5000
+   lambda_nn |         .05
+             |  (selected by loocv CV)
+----------------------------------------------------------------
 ```
 
 `cv(resample, trials() ntreated() seed())` and `cv(kfold, folds() seed())` are
@@ -276,7 +290,21 @@ trop y unit time w, group(time) lambda_unit(0) lambda_time(1) lambda_nn(0.1)
 which returns
 
 ```
-
+----------------------------------------------------------------
+        TROP |  Triply Robust Panel estimator
+-------------+--------------------------------------------------
+         ATT |     0.02604
+   Std. err. |     0.02353
+      95% CI |   -0.02230    0.07404
+-------------+--------------------------------------------------
+     N units |         111
+   T periods |          48
+   N treated |          29
+-------------+--------------------------------------------------
+ lambda_unit |      0.0000
+ lambda_time |      1.0000
+   lambda_nn |          .1
+----------------------------------------------------------------
 ```
 
 ## References
