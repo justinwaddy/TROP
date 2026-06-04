@@ -1,10 +1,16 @@
 *! trop: Triply Robust Panel Estimators
-*! Version 0.x.x May 5, 2025 
+*! Version 0.2.1 June 4, 2026
 *! Author: Clarke Damian, Justin Waddy
 *! dclarke@fen.uchile.cl, j.waddy@exeter.ac.uk
 
 /*
 Versions
+0.2.1 June 4, 2026: Standardized the outcome ((Y - overall mean)/overall SD)
+      before fitting; tau/SE/CI are mapped back to the raw scale. Rescale makes lambda_unit/lambda_time/
+      lambda_nn grids standardized i.e. returned lambdas are the standardized scale.
+0.2.0 June 3, 2026: Optimised FISTA, added warm-start nuclear path, and optimised CV algorithms.
+      Added generalized treatment patterns and bootstrapping. FISTA optimises when tau converges rather than
+      L. 
 0.1.0 May 26, 2026: Initial release. Weighted TWFE + nuclear-norm low-rank
        (FISTA with adaptive restart); placebo cross-validation
        (cycle/joint, resample/k-fold); stratified block-bootstrap SE.
@@ -17,24 +23,14 @@ version 15.0
 #delimit ;
 syntax varlist(min=4 max=4) [if] [in],
     [
+    group(string)
     lambda_unit(string)
     lambda_time(string)
     lambda_nn(string)
-    vce(string)
-    reps(integer 200)
-    seed(integer 0)
     cv(string)
-    unit_grid(numlist)
-    time_grid(numlist)
-    nn_grid(string)
-    kfold(integer 0)
+    vce(string)
     level(integer 95)
-    returnweights
-    generate(string)
     verbose
-    ntrials(integer 0)
-    ntreated(integer 0)
-    cv_seed(integer 0)
     ]
     ;
 #delimit cr
@@ -43,15 +39,95 @@ syntax varlist(min=4 max=4) [if] [in],
 *------------------------------------------------------------------------------*
 * (0) Error checks
 *------------------------------------------------------------------------------*
+
+*--- group() ---*
+if "`group'" == "" local group "cell"
+if !inlist("`group'", "cell", "time") {
+    di as error "group() must be 'cell' or 'time'."
+    exit 198
+}
+
+*--- cv(method [search] [, suboptions]) ; default loocv cycle ---*
+local cv_method "loocv"
+local cv_search "cycle"
+local cv_seed   0
+local ntrials   200
+local ntreated  1
+local kfold     5
+local unit_grid ""
+local time_grid ""
+local nn_grid   ""
+if `"`cv'"' != "" {
+    local _cc = strpos(`"`cv'"', ",")
+    if `_cc' == 0 local _cvmain = trim(`"`cv'"')
+    else          local _cvmain = trim(substr(`"`cv'"', 1, `_cc'-1))
+    local _m : word 1 of `_cvmain'
+    local _s : word 2 of `_cvmain'
+    if "`_m'" != "" local cv_method "`_m'"
+    if "`_s'" != "" local cv_search "`_s'"
+    if `_cc' != 0 {
+        local _cvsub = substr(`"`cv'"', `_cc'+1, .)
+        foreach _k in trials ntreated folds seed unit_grid time_grid nn_grid {
+            local _p = strpos(`"`_cvsub'"', "`_k'(")
+            if `_p' > 0 {
+                local _rest = substr(`"`_cvsub'"', `_p' + length("`_k'("), .)
+                local _q = strpos(`"`_rest'"', ")")
+                local _`_k' = substr(`"`_rest'"', 1, `_q'-1)
+            }
+        }
+        if "`_trials'"      != "" local ntrials   = `_trials'
+        if "`_ntreated'"    != "" local ntreated  = `_ntreated'
+        if "`_folds'"       != "" local kfold     = `_folds'
+        if "`_seed'"        != "" local cv_seed   = `_seed'
+        if `"`_unit_grid'"' != "" local unit_grid `"`_unit_grid'"'
+        if `"`_time_grid'"' != "" local time_grid `"`_time_grid'"'
+        if `"`_nn_grid'"'   != "" local nn_grid   `"`_nn_grid'"'
+    }
+}
+if !inlist("`cv_method'", "loocv", "resample", "kfold") {
+    di as error "cv(): method must be 'loocv', 'resample', or 'kfold'."
+    exit 198
+}
+if !inlist("`cv_search'", "cycle", "joint") {
+    di as error "cv(): search must be 'cycle' or 'joint'."
+    exit 198
+}
+
+*--- vce(vcetype [, reps(#) seed(#)]) ; default bootstrap ---*
+local reps 200
+local seed 0
+if `"`vce'"' != "" {
+    local _vc = strpos(`"`vce'"', ",")
+    if `_vc' == 0 local vce = trim(`"`vce'"')
+    else {
+        local _vct = trim(substr(`"`vce'"', 1, `_vc'-1))
+        local _vcs = substr(`"`vce'"', `_vc'+1, .)
+        foreach _k in reps seed {
+            local _p = strpos(`"`_vcs'"', "`_k'(")
+            if `_p' > 0 {
+                local _rest = substr(`"`_vcs'"', `_p' + length("`_k'("), .)
+                local _q = strpos(`"`_rest'"', ")")
+                local _v`_k' = substr(`"`_rest'"', 1, `_q'-1)
+            }
+        }
+        if "`_vreps'" != "" local reps = `_vreps'
+        if "`_vseed'" != "" local seed = `_vseed'
+        local vce "`_vct'"
+    }
+}
+if "`vce'" == "" local vce "bootstrap"
+if !inlist("`vce'", "bootstrap", "noinference") {
+    di as error "vce() must be 'bootstrap' or 'noinference'."
+    exit 198
+}
+
 tempvar touse
 mark `touse' `if' `in'
 
 local unitname : word 2 of `varlist'
 
-local stringvar = 0
 capture confirm string variable `unitname'
 if !_rc {
-    local stringvar = 1
     tempvar ID
     quietly egen `ID' = group(`unitname')
     local varlist `1' `ID' `3' `4'
@@ -144,7 +220,6 @@ if "`lambda_time'" != "" {
 local lambda_nn_set = 0
 local lambda_nn_inf = 0
 if "`lambda_nn'" == "" {
-    * unspecified -> resolved by CV later
 }
 else if inlist(lower("`lambda_nn'"), "inf", "infinity", ".") {
     local lambda_nn_inf = 1
@@ -163,12 +238,6 @@ else {
     local lambda_nn_set = 1
 }
 
-if "`vce'" == "" local vce "bootstrap"
-if !inlist("`vce'", "bootstrap", "noinference") {
-    di as error "vce() must be one of: bootstrap, noinference."
-    exit 198
-}
-
 *------------------------------------------------------------------------------*
 * (1) Set-up 
 *------------------------------------------------------------------------------*
@@ -180,6 +249,10 @@ if (length("`if'")+length("`in'")>0) {
 *Wide panels
 mata: Y = rowshape(st_data(., "`1'"), `N')
 mata: W = rowshape(st_data(., "`4'"), `N')
+
+*--- Standardize outcome: (Y - overall mean) / overall SD, in place. ---*
+local Ysd = 1
+mata: trop_standardize_outcome(Y)
 
 tempvar ever_treated unit_row unit_tag
 
@@ -199,7 +272,6 @@ if (length("`if'")+length("`in'")>0) {
 *------------------------------------------------------------------------------*
 * (2) Calculate ATT
 *------------------------------------------------------------------------------*
-*First subsection will be cross-validation code to tune parameters for lambda_unit, lambda_time and lambda_nn if they are not provided.
 if `lambda_unit_set' local lu = `lambda_unit'
 else                 local lu = 0
 
@@ -222,25 +294,6 @@ if "`nn_grid'"   == "" local nn_grid   "`default_nn_grid'"
 
 *K for placebo folds (default 5, overridable via kfold())*
 if `kfold' <= 0 local kfold = 5
-
-*--- CV method/search parsing: cv("method search"), defaults resample cycle ---*
-local cv_method "resample"
-local cv_search "cycle"
-if "`cv'" != "" {
-    tokenize "`cv'"
-    if "`1'" != "" local cv_method "`1'"
-    if "`2'" != "" local cv_search "`2'"
-    * restore positional macros clobbered by tokenize
-    tokenize `varlist'
-}
-if !inlist("`cv_method'", "resample", "kfold") {
-    di as error "cv(): first word (method) must be 'resample' or 'kfold'."
-    exit 198
-}
-if !inlist("`cv_search'", "cycle", "joint") {
-    di as error "cv(): second word (search) must be 'cycle' or 'joint'."
-    exit 198
-}
 
 if `ntrials'  <= 0 local ntrials  = 200
 if `ntreated' <= 0 local ntreated = 1
@@ -276,24 +329,21 @@ if `need_cv' > 0 {
     }
 }
 
-*Estimate on the full panel with resolved lambdas*
-mata: delta = .; delta_unit = .; delta_time = .
-mata: trop_cell_weights(Y, W, strtoreal(tokens(st_local("treated_rows")))', `lu', `lt', delta, delta_unit, delta_time)
+*Estimate on the full panel with resolved lambdas (per-target ATT, Eq.1 / blocks)*
+if "`lnn'" == "." local lnn_arg = .
+else              local lnn_arg = `lnn'
 
-mata: tau_hat = .; mu_hat = .; alpha_hat = .; beta_hat = .; L_hat = .; iters = .
-if "`lnn'" == "." {
-    mata: trop_fit_wls(Y, W, delta, tau_hat, mu_hat, alpha_hat, beta_hat)
-}
-else {
-    mata: trop_fit_nuclear(Y, W, delta, `lnn', 1e-10, 5000, tau_hat, mu_hat, alpha_hat, beta_hat, L_hat, iters)
-}
-mata: st_local("tau_hat", strofreal(tau_hat))
+mata: trop_point_att(Y, W, "`group'", `lu', `lt', `lnn_arg')
 
-
+* Map point estimates back to raw outcome units
+local tau_hat = `tau_hat' * `Ysd'
+matrix __trop_ttau = `Ysd' * __trop_ttau
 *--------------------------------------------------------------------------*
 * (3) Standard error: bootstrap
 *--------------------------------------------------------------------------*
 local se = .
+local ci_lo = .
+local ci_hi = .
 if "`vce'" != "noinference" {
     if `seed' != 0  set seed `seed'
     if "`verbose'" != "" di as txt "Bootstrapping SE (`reps' reps)..."
@@ -301,8 +351,13 @@ if "`vce'" != "noinference" {
     if "`lnn'" == "." local lnn_arg = .
     else              local lnn_arg = `lnn'
 
-    mata: st_numscalar("r(se)", trop_bootstrap_se(Y, W, `lu', `lt', `lnn_arg', 1e-10, 5000, `reps'))
-    local se = r(se)
+    mata: st_numscalar("r(se)", trop_bootstrap_att(Y, W, "`group'", `lu', `lt', `lnn_arg', `reps', `level'))
+    local se    = r(se)
+    local ci_lo = r(ci_lower)
+    local ci_hi = r(ci_upper)
+    local se    = `se' * `Ysd'
+    local ci_lo = `ci_lo' * `Ysd'
+    local ci_hi = `ci_hi' * `Ysd'
 }
 
 *--------------------------------------------------------------------------*
@@ -313,6 +368,10 @@ ereturn scalar tau = `tau_hat'
 ereturn scalar N = `N'
 ereturn scalar T = `T'
 ereturn scalar N_treated = `n_treated'
+ereturn scalar n_targets = `n_targets'
+ereturn local  group "`group'"
+ereturn matrix target_tau    = __trop_ttau
+ereturn matrix target_weight = __trop_twt
 ereturn scalar lambda_unit = `lu'
 ereturn scalar lambda_time = `lt'
 if "`lnn'" == "." ereturn scalar lambda_nn = .
@@ -329,9 +388,8 @@ ereturn local vce "`vce'"
 local have_se = ("`se'" != "." & "`se'" != "")
 if `have_se' {
     ereturn scalar se = `se'
-    local crit = invnormal(1 - (1 - `level'/100)/2)
-    ereturn scalar ci_lower = `tau_hat' - `crit' * `se'
-    ereturn scalar ci_upper = `tau_hat' + `crit' * `se'
+    ereturn scalar ci_lower = `ci_lo'
+    ereturn scalar ci_upper = `ci_hi'
     ereturn scalar z = `tau_hat' / `se'
     ereturn scalar pvalue = 2 * normal(-abs(`tau_hat' / `se'))
     ereturn scalar level = `level'
@@ -350,8 +408,6 @@ di as text %12s "ATT" " {c |}  " as result %10.5f e(tau)
 if `have_se' {
     local cilab = "`level'% CI"
     di as text %12s "Std. err." " {c |}  " as result %10.5f e(se)
-    di as text %12s "z" " {c |}  " as result %10.4f e(z)
-    di as text %12s "P>|z|" " {c |}  " as result %10.4f e(pvalue)
     di as text %12s "`cilab'" " {c |}  " as result %9.5f e(ci_lower) "  " %9.5f e(ci_upper)
 }
 else {
@@ -366,7 +422,7 @@ di as text %12s "lambda_unit" " {c |}  " as result %10.4f `lu'
 di as text %12s "lambda_time" " {c |}  " as result %10.4f `lt'
 di as text %12s "lambda_nn" " {c |}  " as result %10s "`lnn_disp'"
 if `need_cv' > 0 {
-    di as text %12s " " " {c |}  " as text "(selected by `kfold'-fold CV)"
+    di as text %12s " " " {c |}  " as text "(selected by `cv_method' CV)"
 }
 di as text "{hline 13}{c BT}{hline 50}"
 end
@@ -375,10 +431,9 @@ end
 * Mata functions
 *------------------------------------------------------------------------------*
 
+cap mata: mata drop trop_standardize_outcome()
 cap mata: mata drop trop_cell_weights()
-cap mata: mata drop trop_fit_wls()
 cap mata: mata drop trop_svt()
-cap mata: mata drop trop_fit_nuclear()
 cap mata: mata drop trop_placebo_rmse()
 cap mata: mata drop trop_cv_single()
 cap mata: mata drop trop_cv_cycle()
@@ -386,6 +441,41 @@ cap mata: mata drop trop_cv_setup()
 cap mata: mata drop trop_kfold_sets()
 cap mata: mata drop trop_resample_sets()
 cap mata: mata drop trop_cv_joint()
+cap mata: mata drop trop_suff_gram()
+cap mata: mata drop trop_suff_ginv()
+cap mata: mata drop trop_suff_rhs()
+cap mata: mata drop trop_coef_to_fit()
+cap mata: mata drop trop_fit_wls_suff()
+cap mata: mata drop trop_fit_nuclear_suff()
+cap mata: mata drop trop_nuclear_core()
+cap mata: mata drop trop_nuclear_path_suff()
+cap mata: mata drop trop_placebo_rmse_path()
+cap mata: mata drop trop_pairwise_pre_dist()
+cap mata: mata drop trop_loocv_wls_tau()
+cap mata: mata drop trop_loocv_wls_rmse()
+cap mata: mata drop trop_loocv_sets()
+cap mata: mata drop trop_cv_loocv()
+cap mata: mata drop trop_time_weights2()
+cap mata: mata drop trop_unit_weights2()
+cap mata: mata drop trop_target_tau()
+cap mata: mata drop trop_build_groups()
+cap mata: mata drop trop_att()
+cap mata: mata drop trop_point_att()
+cap mata: mata drop trop_quantile()
+cap mata: mata drop trop_bootstrap_att()
+
+mata:
+void trop_standardize_outcome(real matrix Y)
+{
+    real scalar m, s, n
+    n = rows(Y) * cols(Y)
+    m = sum(Y) / n
+    s = sqrt( sum((Y :- m):^2) / (n - 1) )
+    if (s <= 0 | s >= .) s = 1                 // degenerate / missing -> no rescale
+    Y = (Y :- m) :/ s
+    st_local("Ysd", strofreal(s, "%21.16g"))
+}
+end
 
 mata:
 void trop_cell_weights(
@@ -440,44 +530,123 @@ void trop_cell_weights(
 }
 end
 
+// Sufficient-statistics backend (no explicit design matrix X)
 mata:
-void trop_fit_wls(
-    real matrix Y,
-    real matrix W,
-    real matrix delta,
-    real scalar tau,
-    real scalar mu,
-    real colvector alpha,
-    real rowvector beta
-)
+real matrix trop_suff_gram(real matrix delta, real matrix W)
 {
-    real scalar N, T, NT, p
-    real colvector y_vec, w_vec, b
-    real matrix X, D_unit, D_time, XtWX, XtWy
+    real scalar    N, T, p, S, d, ridge, i
+    real colvector ru, cu
+    real rowvector ct, cw
+    real matrix    A, dW
 
-    N  = rows(Y)
-    T  = cols(Y)
-    NT = N * T
+    N = rows(delta); T = cols(delta); p = N + T
+    ridge = 1e-10
 
-    y_vec = vec(Y')
-    w_vec = vec(delta')
+    A  = J(p, p, 0)
+    S  = sum(delta)
+    ru = rowsum(delta)        // N x 1  unit weight sums
+    ct = colsum(delta)        // 1 x T  time weight sums
 
-    D_unit = I(N)[., 2..N] # J(T, 1, 1)
+    // intercept row/col (index 1)
+    A[1,1] = S
+    A[|1,2     \ 1,N      |] = ru[|2\N|]'
+    A[|2,1     \ N,1      |] = ru[|2\N|]
+    A[|1,N+1   \ 1,N+T-1  |] = ct[|2\T|]
+    A[|N+1,1   \ N+T-1,1  |] = ct[|2\T|]'
 
-    D_time = J(N, 1, 1) # I(T)[., 2..T]
+    // unit-unit and time-time diagonals
+    A[|2,2     \ N,N        |] = diag(ru[|2\N|])
+    A[|N+1,N+1 \ N+T-1,N+T-1|] = diag(ct[|2\T|])
 
-    p = 1 + (N - 1) + (T - 1) + 1
-    X = J(NT, 1, 1), D_unit, D_time, vec(W')
+    // unit-time cross block = delta[unit, time]
+    A[|2,N+1   \ N,N+T-1  |] = delta[|2,2 \ N,T|]
+    A[|N+1,2   \ N+T-1,N  |] = delta[|2,2 \ N,T|]'
 
-    XtWX = quadcross(X, w_vec, X)
-    XtWy = quadcross(X, w_vec, y_vec)
+    // treatment column (W is 0/1 so W:^2 = W): weighted sums over treated cells
+    dW = delta :* W
+    d  = sum(dW)
+    cu = rowsum(dW)           // N x 1
+    cw = colsum(dW)           // 1 x T
+    A[1,p] = d ; A[p,1] = d
+    A[|2,p     \ N,p      |] = cu[|2\N|]
+    A[|p,2     \ p,N      |] = cu[|2\N|]'
+    A[|N+1,p   \ N+T-1,p  |] = cw[|2\T|]'
+    A[|p,N+1   \ p,N+T-1  |] = cw[|2\T|]
+    A[p,p] = d
 
-    b = qrsolve(XtWX, XtWy)
+    // tiny ridge on the diagonal for numerical safety
+    for (i = 1; i <= p; i++) A[i,i] = A[i,i] + ridge
 
-    mu    = b[1]
-    alpha = 0 \ b[2..N]
-    beta  = (0, b[(N + 1)..(N + T - 1)]')
-    tau   = b[p]
+    return(A)
+}
+end
+
+// Invert the (symmetric, positive-definite) Gram once; reused across
+// nuclear-norm path. cholinv() returns all-missing on a near-singular matrix
+// so we guard and fall back to the generalized symmetric inverse invsym().
+mata:
+real matrix trop_suff_ginv(real matrix delta, real matrix W)
+{
+    real matrix Gi
+    Gi = cholinv(trop_suff_gram(delta, W))
+    if (missing(Gi)) Gi = invsym(trop_suff_gram(delta, W))
+    return(Gi)
+}
+end
+
+mata:
+real colvector trop_suff_rhs(real matrix delta, real matrix Ytil, real matrix W)
+{
+    real scalar    N, T, p
+    real matrix    DYt
+    real colvector b, rb
+    real rowvector cb
+
+    N = rows(delta); T = cols(delta); p = N + T
+    DYt = delta :* Ytil
+    rb  = rowsum(DYt)         // N x 1
+    cb  = colsum(DYt)         // 1 x T
+
+    b = J(p, 1, 0)
+    b[1]            = sum(DYt)
+    b[|2\N|]        = rb[|2\N|]
+    b[|N+1\N+T-1|]  = cb[|2\T|]'
+    b[p]            = sum(DYt :* W)
+    return(b)
+}
+end
+
+mata:
+real matrix trop_coef_to_fit(real colvector coef, real matrix W, real scalar N, real scalar T)
+{
+    real scalar    mu, tau
+    real colvector alpha
+    real rowvector beta
+
+    mu    = coef[1]
+    alpha = 0 \ coef[|2\N|]                 
+    beta  = 0 , (coef[|N+1\N+T-1|])'        
+    tau   = coef[N+T]
+    return( mu :+ (alpha * J(1,T,1)) :+ (J(N,1,1) * beta) :+ tau :* W )
+}
+end
+
+mata:
+void trop_fit_wls_suff(
+    real matrix Y, real matrix W, real matrix delta,
+    real scalar tau, real scalar mu,
+    real colvector alpha, real rowvector beta)
+{
+    real scalar    N, T, p
+    real colvector coef
+
+    N = rows(Y); T = cols(Y); p = N + T
+    coef = trop_suff_ginv(delta, W) * trop_suff_rhs(delta, Y, W)
+
+    mu    = coef[1]
+    alpha = 0 \ coef[|2\N|]
+    beta  = 0 , (coef[|N+1\N+T-1|])'
+    tau   = coef[p]
 }
 end
 
@@ -497,123 +666,153 @@ real matrix trop_svt(real matrix Z, real scalar thr, real scalar nucnorm)
 }
 end
 
+// ---------------------------------------------------------------------
+// Profiled-FISTA core. Takes a PRE-BUILT Gram inverse (Ginv) and a WARM
+// START L (in/out). cv_mode=0 exact (re-solve at L_new, stop on dL,dtau,dobj); 
+// =1 CV mode (single solve/iter, stop on dtau).
 mata:
-void trop_fit_nuclear(
-    real matrix Y,
-    real matrix W,
-    real matrix delta,
-    real scalar lambda_nn,
-    real scalar tol,
-    real scalar max_iter,
-    real scalar tau,
-    real scalar mu,
-    real colvector alpha,
-    real rowvector beta,
-    real matrix L,
-    real scalar iters
-)
+void trop_nuclear_core(
+    real matrix Y, real matrix W, real matrix delta,
+    real scalar lambda_nn, real scalar tol, real scalar max_iter, real scalar cv_mode,
+    real matrix Ginv,
+    real matrix L, real scalar tau, real scalar iters)
 {
-    real scalar N, T, NT, p, k, delta_max, Lip, step, thr
-    real scalar t_mom, t_new
-    real scalar tol_tau, tol_L, tol_obj
-    real scalar tau_new, tau_old, obj_new, obj_old, nucnorm, datafit
-    real scalar tau_change, L_change, obj_change, normL, restart_grad
-    real colvector w_vec, y_vec, b
-    real matrix D_unit, D_time, X, XtWX
-    real matrix Z, L_new, fe, R, grad
+    real scalar N, T, p, k, maxd, step, thr
+    real scalar a, a_next, mom, nucnorm
+    real scalar tau_new, tau_old, obj_new, obj_old, dL, dtau, dobj, normL, restart
+    real matrix L_prev, Yk, Ytil, R, Gstep, L_new
+    real colvector coef
 
-    N  = rows(Y); T = cols(Y); NT = N * T
+    N = rows(Y); T = cols(Y); p = N + T
+    maxd = max(delta)
+    step = 1 / (2 * maxd)
+    thr  = step * lambda_nn
 
-    D_unit = I(N)[., 2..N] # J(T, 1, 1)
-    D_time = J(N, 1, 1) # I(T)[., 2..T]
-    p = 1 + (N - 1) + (T - 1) + 1
-    X = J(NT, 1, 1), D_unit, D_time, vec(W')
-
-    w_vec = vec(delta')
-    XtWX  = quadcross(X, w_vec, X)
-
-    delta_max = max(delta)
-    if (delta_max <= 0) {
-        errprintf("All delta weights are zero.\n")
-        exit(498)
-    }
-
-    // Fixed step from a global Lipschitz bound on the smooth weighted loss.
-    Lip  = 2 * delta_max
-    step = 1 / Lip
-    thr  = lambda_nn / Lip
-
-    // Tolerances derived from the single `tol`. The treatment estimate (tau) is
-    // the primary convergence criterion; the low-rank component and penalized
-    // objective are looser "still-moving?" safeguards, so we do not stop while
-    // L is still rearranging the factor structure (which can leave tau briefly
-    // stalled and then move again).
-    tol_tau = tol
-    tol_L   = tol;  if (tol_L   < 1e-8) tol_L   = 1e-8
-    tol_obj = tol;  if (tol_obj < 1e-8) tol_obj = 1e-8
-
-    L       = J(N, T, 0)
-    Z       = L
-    t_mom   = 1
-    tau_old = .         // missing -> first-iteration changes are non-binding
+    L_prev  = L                 // warm start: L supplied by caller (J(N,T,0) if cold)
+    a       = 1
+    tau_old = .
     obj_old = .
     nucnorm = 0
+    iters   = 0
 
     for (k = 1; k <= max_iter; k++) {
+        iters  = k
+        a_next = (1 + sqrt(1 + 4 * a^2)) / 2
+        mom    = (a - 1) / a_next
+        Yk     = L + mom :* (L - L_prev)
+        Ytil   = Y - Yk
+        coef   = Ginv * trop_suff_rhs(delta, Ytil, W)
+        R      = Ytil - trop_coef_to_fit(coef, W, N, T)
+        Gstep  = Yk + (delta :* R) :/ maxd
+        L_new  = trop_svt(Gstep, thr, nucnorm)
 
-        // (a) Fixed-effect step: exact weighted LS on (Y - Z), at extrapolation Z.
-        y_vec   = vec((Y - Z)')
-        b       = qrsolve(XtWX, quadcross(X, w_vec, y_vec))
-        fe      = rowshape(X * b, N)
-        tau     = b[p]
-        tau_new = tau
+        restart = sum((Yk - L_new) :* (L_new - L))
+        if (restart > 0) a_next = 1
 
-        // (b) Low-rank proximal-gradient (FISTA) step; gradient taken at Z.
-        R     = Y - fe
-        grad  = -2 :* delta :* (R - Z)
-        L_new = trop_svt(Z - step :* grad, thr, nucnorm)
-
-        // (c) Penalized objective at the current iterate (fe, L_new). Data fit
-        //     reuses R; nuclear norm comes back from trop_svt
-        datafit = sum(delta :* ((R - L_new):^2))
-        obj_new = datafit + lambda_nn * nucnorm
-
-        // (d) Adaptive restart (O'Donoghue & Candes 2015). Reset momentum if the
-        //     gradient-mapping direction opposes progress (gradient scheme) OR
-        //     the penalized objective increased (function scheme). Either flags
-        //     an overshoot; resetting preserves the O(1/k^2) guarantee while
-        //     suppressing the oscillation that hurts ill-conditioned weights.
-        restart_grad = sum((Z - L_new) :* (L_new - L))
-        if (restart_grad > 0 | obj_new > obj_old + 1e-10 * max((1, abs(obj_old)))) {
-            t_new = 1
-            Z     = L_new
+        if (cv_mode) {
+            tau_new = coef[p]
+            dtau = (tau_old < . ? abs(tau_new - tau_old) / (1 + abs(tau_old)) : .)
+            L_prev = L; L = L_new; a = a_next; tau_old = tau_new
+            if (dtau < tol) break
         }
         else {
-            t_new = (1 + sqrt(1 + 4 * t_mom^2)) / 2
-            Z     = L_new + ((t_mom - 1) / t_new) :* (L_new - L)
+            coef    = Ginv * trop_suff_rhs(delta, Y - L_new, W)
+            R       = (Y - L_new) - trop_coef_to_fit(coef, W, N, T)
+            obj_new = sum(delta :* (R:^2)) + lambda_nn * nucnorm
+            tau_new = coef[p]
+            normL   = sqrt(sum(L:^2))
+            dL   = sqrt(sum((L_new - L):^2)) / (1 + normL)
+            dtau = (tau_old < . ? abs(tau_new - tau_old) / (1 + abs(tau_old)) : .)
+            dobj = (obj_old < . ? abs(obj_new - obj_old) / (1 + abs(obj_old)) : .)
+            L_prev = L; L = L_new; a = a_next; tau_old = tau_new; obj_old = obj_new
+            if (dtau < tol & dobj < tol) break
         }
-
-        // (e) Relative changes for the stopping rule.
-        normL      = sqrt(sum(L_new:^2))
-        tau_change = abs(tau_new - tau_old) / max((1, abs(tau_new)))
-        L_change   = sqrt(sum((L_new - L):^2)) / max((1, normL))
-        obj_change = abs(obj_new - obj_old) / max((1, abs(obj_new)))
-
-        // Advance state.
-        L       = L_new
-        t_mom   = t_new
-        tau_old = tau_new
-        obj_old = obj_new
-
-        // (f) Converged when the treatment estimate is stable AND the low-rank
-        //     component and objective are no longer materially moving.
-        if (tau_change < tol_tau & L_change < tol_L & obj_change < tol_obj) break
     }
+    coef = Ginv * trop_suff_rhs(delta, Y - L, W)
+    tau  = coef[p]
+}
+end
 
-    mu    = b[1]
-    alpha = 0 \ b[2..N]
-    beta  = (0, b[(N + 1)..(N + T - 1)]')
-    iters = min((k, max_iter))
+// Thin wrapper: Builds the Gram inverse,
+// cold-starts L, runs the core, unpacks all coefficients.
+mata:
+void trop_fit_nuclear_suff(
+    real matrix Y, real matrix W, real matrix delta,
+    real scalar lambda_nn, real scalar tol, real scalar max_iter, real scalar cv_mode,
+    real scalar tau, real scalar mu,
+    real colvector alpha, real rowvector beta,
+    real matrix L, real scalar iters)
+{
+    real scalar N, T, p
+    real matrix Ginv
+    real colvector coef
+
+    N = rows(Y); T = cols(Y); p = N + T
+    if (lambda_nn >= .) {
+        trop_fit_wls_suff(Y, W, delta, tau, mu, alpha, beta)
+        L = J(N, T, 0); iters = 0
+        return
+    }
+    Ginv = trop_suff_ginv(delta, W)
+    L = J(N, T, 0)                          // cold start
+    trop_nuclear_core(Y, W, delta, lambda_nn, tol, max_iter, cv_mode, Ginv, L, tau, iters)
+    coef  = Ginv * trop_suff_rhs(delta, Y - L, W)
+    mu    = coef[1]
+    alpha = 0 \ coef[|2\N|]
+    beta  = 0 , (coef[|N+1\N+T-1|])'
+    tau   = coef[p]
+}
+end
+
+// Warm-started descending lambda_nn path. The Gram inverse is built ONCE and
+// reused across the whole grid; L is warm-started from the previous (larger)
+// lambda_nn so the expensive small-penalty solves start near their answer.
+// lambda_nn = infinity is encoded as missing (.) and handled as WLS.
+// Returns tau per grid point IN INPUT ORDER; fills iters_out likewise.
+mata:
+real rowvector trop_nuclear_path_suff(
+    real matrix Y, real matrix W, real matrix delta,
+    real rowvector nn_grid, real scalar tol, real scalar max_iter, real scalar cv_mode,
+    real rowvector iters_out)
+{
+    real scalar ng, p, nfin, k, j, pos, lam, tau, it, twls, i
+    real matrix Ginv, Lw
+    real rowvector taus, finvals, fin_pos, inf_pos
+    real colvector ord, coef
+
+    ng = cols(nn_grid)
+    p  = rows(Y) + cols(Y)
+    taus      = J(1, ng, .)
+    iters_out = J(1, ng, 0)
+
+    Ginv = trop_suff_ginv(delta, W)         // built ONCE, reused across the path
+
+    coef = Ginv * trop_suff_rhs(delta, Y, W)   // WLS tau for any inf (.) entries
+    twls = coef[p]
+
+    fin_pos = selectindex(nn_grid :< .)     // positions of finite lambda_nn (row in -> row out)
+    inf_pos = selectindex(nn_grid :>= .)    // positions of infinite (missing) lambda_nn
+
+    if (cols(fin_pos) > 0) {
+        nfin    = cols(fin_pos)
+        finvals = nn_grid[fin_pos]
+        ord     = order(finvals', 1)        // ascending; walked descending below
+        Lw      = J(rows(Y), cols(Y), 0)    // cold start for the LARGEST lambda_nn
+        for (k = nfin; k >= 1; k--) {
+            j   = ord[k]
+            lam = finvals[j]
+            pos = fin_pos[j]
+            tau = .; it = .
+            trop_nuclear_core(Y, W, delta, lam, tol, max_iter, cv_mode, Ginv, Lw, tau, it)
+            taus[pos]      = tau
+            iters_out[pos] = it             // Lw now warm-starts the next smaller lambda_nn
+        }
+    }
+    for (i = 1; i <= cols(inf_pos); i++) {
+        taus[inf_pos[i]]      = twls
+        iters_out[inf_pos[i]] = 0
+    }
+    return(taus)
 }
 end
 
@@ -636,11 +835,11 @@ real scalar trop_placebo_tau(
 
     tau_hat = .; mu_hat = .; alpha_hat = .; beta_hat = .; L_hat = .; iters = .
     if (lnn >= .) {     // missing encodes lambda_nn = infinity (WLS path)
-        trop_fit_wls(Yc, Wp, delta, tau_hat, mu_hat, alpha_hat, beta_hat)
+        trop_fit_wls_suff(Yc, Wp, delta, tau_hat, mu_hat, alpha_hat, beta_hat)
     }
     else {
-        trop_fit_nuclear(Yc, Wp, delta, lnn, tol, max_iter,
-                         tau_hat, mu_hat, alpha_hat, beta_hat, L_hat, iters)
+        trop_fit_nuclear_suff(Yc, Wp, delta, lnn, tol, max_iter, 0,
+                              tau_hat, mu_hat, alpha_hat, beta_hat, L_hat, iters)
     }
     return(tau_hat)
 }
@@ -685,13 +884,206 @@ real scalar trop_placebo_rmse(
 end
 
 mata:
-// cv_single: tune one lambda over a grid (placebo CV), others fixed.
-//   which_lambda : 1 = unit, 2 = time, 3 = nn
-//   fixed1, fixed2: the other two, in canonical order
-// Sets are PASSED IN (built once by the caller) so every lambda on the grid —
-// and every coordinate/cycle in cv_cycle — is scored on the SAME placebo folds.
-// This matches the Python reference (draw once, reuse) and makes cross-lambda
-// RMSE comparisons apples-to-apples.
+// Placebo RMSE for a WHOLE lambda_nn grid at fixed (lu, lt), in ONE warm-started
+// sweep per placebo set (Gram inverse built once per set, L warm-started down the
+// grid). cv_mode forwards to the tau-stop solver. Returns RMSE per lambda_nn,
+// aligned to nn_grid. Equivalent to looping trop_placebo_rmse over the grid, but
+// far cheaper: it reuses the factorisation and warm starts across penalties.
+real rowvector trop_placebo_rmse_path(
+    real matrix Yc, real scalar treated_periods,
+    pointer(real colvector) rowvector sets,
+    real scalar lu, real scalar lt, real rowvector nn_grid,
+    real scalar tol, real scalar max_iter, real scalar cv_mode)
+{
+    real scalar Nc, T, J_sets, j, ng, g
+    real colvector set_rows, delta_unit
+    real rowvector delta_time, taus, it_out, sq_accum, count, rmse
+    real matrix Wp, delta
+
+    Nc = rows(Yc); T = cols(Yc); J_sets = cols(sets); ng = cols(nn_grid)
+    sq_accum = J(1, ng, 0)
+    count    = J(1, ng, 0)
+
+    for (j = 1; j <= J_sets; j++) {
+        set_rows = *sets[j]
+        Wp = J(Nc, T, 0)
+        Wp[set_rows, (T - treated_periods + 1)..T] = J(rows(set_rows), treated_periods, 1)
+
+        delta = .; delta_unit = .; delta_time = .
+        trop_cell_weights(Yc, Wp, set_rows, lu, lt, delta, delta_unit, delta_time)
+
+        it_out = .
+        taus = trop_nuclear_path_suff(Yc, Wp, delta, nn_grid, tol, max_iter, cv_mode, it_out)
+
+        for (g = 1; g <= ng; g++) {
+            if (taus[g] < .) {                  // finite (missing . is largest)
+                sq_accum[g] = sq_accum[g] + taus[g]^2
+                count[g]    = count[g] + 1
+            }
+        }
+    }
+
+    rmse = J(1, ng, .)
+    for (g = 1; g <= ng; g++) {
+        if (count[g] > 0) rmse[g] = sqrt(sq_accum[g] / count[g])
+    }
+    return(rmse)
+}
+end
+
+mata:
+// Nc x Nc pre-period RMS distance between control units, via one GEMM using
+// ||x_i - x_j||^2 = g_i + g_j - 2 G_ij  (g = diagonal of G = Ypre Ypre').
+// Equals the single-treated-unit reference distance in trop_cell_weights;
+// dist(i,i) = 0 exactly, so exp(-lu*0) = 1 (the telescoping uses this).
+real matrix trop_pairwise_pre_dist(real matrix Yc, real scalar treated_periods)
+{
+    real scalar    Nc, T, npre
+    real matrix    Ypre, G, d2
+    real colvector g
+
+    Nc = rows(Yc); T = cols(Yc); npre = T - treated_periods
+    Ypre = Yc[|1,1 \ Nc,npre|]
+    G  = Ypre * Ypre'
+    g  = diagonal(G)
+    d2 = g*J(1,Nc,1) :+ J(Nc,1,1)*g' :- 2:*G
+    d2 = d2 :* (d2 :> 0)                          // clamp roundoff negatives
+    return( sqrt(d2 :/ npre) )
+}
+end
+
+mata:
+// ALL Nc leave-one-unit-out WLS (lambda_nn = inf) placebo taus at once.
+real colvector trop_loocv_wls_tau(
+    real matrix Yc, real scalar lambda_unit, real scalar lambda_time,
+    real scalar treated_periods, real matrix Dmat)
+{
+    real scalar    Nc, T, center, B, Pb, qb2
+    real rowvector dtime, bvec, pvec, qvec, hvec
+    real colvector Yh, Avec, AY
+    real matrix    Amat
+
+    Nc = rows(Yc); T = cols(Yc)
+    center = T - treated_periods/2
+    dtime  = abs(((1..T) :- 1) :- center)               // |t - center|, t = 0..T-1
+    bvec   = exp(-lambda_time :* dtime)                  // 1 x T time weights
+    pvec   = J(1, T, 0)
+    pvec[|1,(T-treated_periods+1) \ 1,T|] = J(1, treated_periods, 1)
+
+    B    = sum(bvec)
+    Pb   = sum(bvec :* pvec)
+    qvec = pvec :- Pb/B
+    hvec = bvec :* qvec
+    qb2  = sum(bvec :* (qvec:^2))
+
+    Yh   = Yc * hvec'                                    // Nc x 1
+    Amat = exp(-lambda_unit :* Dmat)                     // Nc x Nc, col j = a_j
+    Avec = colsum(Amat)'                                 // Nc x 1, A_j = sum_i a_j[i]
+    AY   = Amat' * Yh                                    // Nc x 1
+
+    return( (Yh - AY:/Avec) :/ ((1 :- 1:/Avec) :* qb2) )
+}
+end
+
+mata:
+// LOOCV WLS placebo RMSE = sqrt(mean_j tau_j^2): the lambda_nn = inf criterion.
+real scalar trop_loocv_wls_rmse(
+    real matrix Yc, real scalar lambda_unit, real scalar lambda_time,
+    real scalar treated_periods, real matrix Dmat)
+{
+    real colvector tau
+    tau = trop_loocv_wls_tau(Yc, lambda_unit, lambda_time, treated_periods, Dmat)
+    return( sqrt(mean(tau:^2)) )
+}
+end
+
+mata:
+pointer(real colvector) rowvector trop_loocv_sets(real scalar Nc)
+{
+    real scalar    i
+    real colvector idx
+    pointer(real colvector) rowvector sets
+    idx  = (1::Nc)                          // 1, 2, ..., Nc
+    sets = J(1, Nc, NULL)
+    for (i = 1; i <= Nc; i++) sets[i] = &(idx[i])   // each placebo = one control unit
+    return(sets)
+}
+end
+
+mata:
+// LOOCV cross-validation:
+// Stage 1 (marginal): tune lambda_time at (lu=0, lnn=inf) and lambda_unit at
+//   (lt=0, lnn=inf) via the CLOSED FORM (trop_loocv_wls_rmse, ~free over all Nc
+//   folds); tune lambda_nn at (lu=lt=0) via the warm path. Stage 2 (cycle):
+//   cycle unit -> time -> nn via the warm path scorer at the current lambdas
+//   (cv_mode), until the triple stops changing.
+void trop_cv_loocv(
+    real matrix Yc, real scalar treated_periods,
+    pointer(real colvector) rowvector sets, real matrix Dmat,
+    real rowvector unit_grid, real rowvector time_grid, real rowvector nn_grid,
+    real scalar tune_unit, real scalar tune_time, real scalar tune_nn,
+    real scalar tol, real scalar max_iter, real scalar max_cycles,
+    real scalar lambda_unit, real scalar lambda_time, real scalar lambda_nn,
+    real scalar cycles_used)
+{
+    real scalar c, g, ng, best, bestsc, sc, lu_old, lt_old, lnn_old
+    real rowvector scores
+
+    // ---- Stage 1: marginal tuning ----
+    if (tune_time) {
+        ng = cols(time_grid); best = 1; bestsc = .
+        for (g = 1; g <= ng; g++) {
+            sc = trop_loocv_wls_rmse(Yc, 0, time_grid[g], treated_periods, Dmat)
+            if (bestsc >= . | sc < bestsc) { 
+                bestsc = sc; best = g
+            }
+        }
+        lambda_time = time_grid[best]
+    }
+    if (tune_unit) {
+        ng = cols(unit_grid); best = 1; bestsc = .
+        for (g = 1; g <= ng; g++) {
+            sc = trop_loocv_wls_rmse(Yc, unit_grid[g], 0, treated_periods, Dmat)
+            if (bestsc >= . | sc < bestsc) {
+                bestsc = sc; best = g
+            }
+        }
+        lambda_unit = unit_grid[best]
+    }
+    if (tune_nn) {
+        scores = trop_placebo_rmse_path(Yc, treated_periods, sets, 0, 0, nn_grid, tol, max_iter, 1)
+        ng = cols(nn_grid); best = 1; bestsc = .
+        for (g = 1; g <= ng; g++) {
+            if (scores[g] < . & (bestsc >= . | scores[g] < bestsc)) {
+                bestsc = scores[g]; best = g
+            }
+        }
+        lambda_nn = nn_grid[best]
+    }
+
+    // ---- Stage 2: coordinate cycle (warm path scorer at the current lnn) ----
+    scores = .
+    for (c = 1; c <= max_cycles; c++) {
+        lu_old = lambda_unit; lt_old = lambda_time; lnn_old = lambda_nn
+        if (tune_unit)
+            lambda_unit = trop_cv_single(Yc, treated_periods, sets, unit_grid, 1,
+                                         lambda_time, lambda_nn, tol, max_iter, scores)
+        if (tune_time)
+            lambda_time = trop_cv_single(Yc, treated_periods, sets, time_grid, 2,
+                                         lambda_unit, lambda_nn, tol, max_iter, scores)
+        if (tune_nn)
+            lambda_nn = trop_cv_single(Yc, treated_periods, sets, nn_grid, 3,
+                                       lambda_unit, lambda_time, tol, max_iter, scores)
+        if (lambda_unit == lu_old & lambda_time == lt_old & lambda_nn == lnn_old) {
+            cycles_used = c
+            return
+        }
+    }
+    cycles_used = max_cycles
+}
+end
+
+mata:
 real scalar trop_cv_single(
     real matrix Yc,
     real scalar treated_periods,
@@ -705,29 +1097,38 @@ real scalar trop_cv_single(
     real rowvector scores
 )
 {
-    real scalar ng, g, lu, lt, lnn
-    real scalar best_idx, best_score
+    real scalar ng, g, best_idx, best_score, cv_mode
+    real rowvector nn1
 
     ng = cols(grid)
-    scores = J(1, ng, .)
+    cv_mode = 1                              // CV uses the fast tau-stop solver
 
-    for (g = 1; g <= ng; g++) {
-        if (which_lambda == 1) {
-            lu = grid[g]; lt = fixed1; lnn = fixed2
+    if (which_lambda == 3) {
+        // nn coordinate: lu=fixed1, lt=fixed2; whole grid in ONE warm sweep/set
+        scores = trop_placebo_rmse_path(Yc, treated_periods, sets,
+                                        fixed1, fixed2, grid, tol, max_iter, cv_mode)
+    }
+    else if (which_lambda == 1) {
+        // unit coordinate: lu=grid[g], lt=fixed1, lnn=fixed2
+        scores = J(1, ng, .)
+        for (g = 1; g <= ng; g++) {
+            nn1 = (fixed2)
+            scores[g] = trop_placebo_rmse_path(Yc, treated_periods, sets,
+                                               grid[g], fixed1, nn1, tol, max_iter, cv_mode)[1]
         }
-        else if (which_lambda == 2) {
-            lu = fixed1; lt = grid[g]; lnn = fixed2
+    }
+    else if (which_lambda == 2) {
+        // time coordinate: lu=fixed1, lt=grid[g], lnn=fixed2
+        scores = J(1, ng, .)
+        for (g = 1; g <= ng; g++) {
+            nn1 = (fixed2)
+            scores[g] = trop_placebo_rmse_path(Yc, treated_periods, sets,
+                                               fixed1, grid[g], nn1, tol, max_iter, cv_mode)[1]
         }
-        else if (which_lambda == 3) {
-            lu = fixed1; lt = fixed2; lnn = grid[g]
-        }
-        else {
-            errprintf("trop_cv_single(): which_lambda must be 1, 2, or 3.\n")
-            exit(198)
-        }
-
-        scores[g] = trop_placebo_rmse(
-            Yc, treated_periods, sets, lu, lt, lnn, tol, max_iter)
+    }
+    else {
+        errprintf("trop_cv_single(): which_lambda must be 1, 2, or 3.\n")
+        exit(198)
     }
 
     best_idx = .; best_score = .
@@ -804,7 +1205,7 @@ end
 mata:
 void trop_cv_setup(real matrix Yfull, real matrix Wfull)
 {
-    real matrix Yc
+    real matrix Yc, Dmat
     real rowvector unit_grid, time_grid, nn_grid
     real colvector control_rows
     real scalar treated_periods, K, tol, max_iter, max_cycles, Nc
@@ -830,7 +1231,7 @@ void trop_cv_setup(real matrix Yfull, real matrix Wfull)
     nn_grid   = strtoreal(tokens(st_local("nn_grid")))
 
     K          = strtoreal(st_local("kfold"))
-    tol        = 1e-10
+    tol        = 1e-6
     max_iter   = 5000
     max_cycles = 50
 
@@ -848,34 +1249,41 @@ void trop_cv_setup(real matrix Yfull, real matrix Wfull)
     ntrials  = strtoreal(st_local("ntrials"))
     ntreated = strtoreal(st_local("ntreated"))
 
-    // Build placebo sets ONCE, by the chosen sampling method. The command body
-    // has already `set seed`'d, so these draws are reproducible.
-    if (method == "resample") {
-        sets = trop_resample_sets(Nc, ntrials, ntreated)
-    }
-    else {   // "kfold"
-        sets = trop_kfold_sets(Nc, K)
-    }
-
     cycles_used = .
-    if (search == "joint") {
-        // Exhaustive grid. Joint always tunes all three dimensions over the
-        // supplied grids; fixed coordinates are honored by passing a 1-element
-        // grid (handled in the command body when a lambda is user-set).
-        best_rmse = .; n_eval = .
-        trop_cv_joint(Yc, treated_periods, sets,
+    if (method == "loocv") {
+        // Each control unit treated once; closed form for the lambda_nn=inf
+        // marginal tuning, warm path for the rest (staged-marginal + cycle).
+        sets = trop_loocv_sets(Nc)
+        Dmat = trop_pairwise_pre_dist(Yc, treated_periods)
+        trop_cv_loocv(Yc, treated_periods, sets, Dmat,
                       unit_grid, time_grid, nn_grid,
-                      tol, max_iter,
-                      lambda_unit, lambda_time, lambda_nn, best_rmse, n_eval)
-        st_local("cv_cycles", "0")   // joint is not iterative
-    }
-    else {   // "cycle"
-        (void) trop_cv_cycle(Yc, treated_periods, sets,
-                             unit_grid, time_grid, nn_grid,
-                             tune_unit, tune_time, tune_nn,
-                             tol, max_iter, max_cycles,
-                             lambda_unit, lambda_time, lambda_nn, cycles_used)
+                      tune_unit, tune_time, tune_nn,
+                      tol, max_iter, max_cycles,
+                      lambda_unit, lambda_time, lambda_nn, cycles_used)
         st_local("cv_cycles", strofreal(cycles_used))
+    }
+    else {
+        // Build placebo sets ONCE, by the chosen sampling method. The command
+        // body has already `set seed`'d, so these draws are reproducible.
+        if (method == "resample") sets = trop_resample_sets(Nc, ntrials, ntreated)
+        else                      sets = trop_kfold_sets(Nc, K)
+
+        if (search == "joint") {
+            best_rmse = .; n_eval = .
+            trop_cv_joint(Yc, treated_periods, sets,
+                          unit_grid, time_grid, nn_grid,
+                          tol, max_iter,
+                          lambda_unit, lambda_time, lambda_nn, best_rmse, n_eval)
+            st_local("cv_cycles", "0")   // joint is not iterative
+        }
+        else {   // "cycle"
+            (void) trop_cv_cycle(Yc, treated_periods, sets,
+                                 unit_grid, time_grid, nn_grid,
+                                 tune_unit, tune_time, tune_nn,
+                                 tol, max_iter, max_cycles,
+                                 lambda_unit, lambda_time, lambda_nn, cycles_used)
+            st_local("cv_cycles", strofreal(cycles_used))
+        }
     }
 
     st_local("lu", strofreal(lambda_unit))
@@ -885,90 +1293,9 @@ void trop_cv_setup(real matrix Yfull, real matrix Wfull)
 }
 end
 
-cap mata: mata drop trop_bootstrap_se()
-
-mata:
-
-// Stratified bootstrap SE (Algorithm 3). Resample N1 treated rows and N0
-// control rows with replacement, rebuild the panel, recompute tau at FIXED
-// lambdas, repeat reps times. SE = sqrt((B-1)/B) * sd(tau_b).
-//
-// Seeding: caller does `set seed` in Stata before this is invoked; Mata's
-// runiform() shares Stata's RNG stream, so the draws are reproducible.
-real scalar trop_bootstrap_se(
-    real matrix Y, real matrix W,
-    real scalar lu, real scalar lt, real scalar lnn,
-    real scalar tol, real scalar max_iter, real scalar reps)
-{
-    real scalar b, tau_b, mu_b, iters
-    real scalar B_eff, tbar, ssq
-    real colvector ctrl_rows, trt_rows, n0, n1
-    real colvector samp_ctrl, samp_trt, samp_rows
-    real colvector alpha_b, delta_unit, treated_units
-    real rowvector beta_b, delta_time
-    real matrix Yb, Wb, delta, L_b
-    real colvector tau_store
-
-    // Row partition by ever-treated status.
-    trt_rows  = selectindex(rowsum(W) :> 0)
-    ctrl_rows = selectindex(rowsum(W) :== 0)
-    n1 = rows(trt_rows)
-    n0 = rows(ctrl_rows)
-
-    if (n1 == 0 | n0 == 0) {
-        errprintf("Bootstrap requires both treated and control units.\n")
-        return(.)
-    }
-
-    tau_store = J(reps, 1, .)
-
-    for (b = 1; b <= reps; b++) {
-        // Resample WITH replacement within each stratum.
-        samp_trt  = trt_rows[ ceil(n1 :* runiform(n1, 1)) ]
-        samp_ctrl = ctrl_rows[ ceil(n0 :* runiform(n0, 1)) ]
-        samp_rows = samp_trt \ samp_ctrl
-
-        Yb = Y[samp_rows, .]
-        Wb = W[samp_rows, .]
-
-        // Recompute weights and estimate at FIXED lambdas.
-        delta = .; delta_unit = .; delta_time = .
-        treated_units = selectindex(rowsum(Wb) :> 0)
-        if (rows(treated_units) == 0) continue   // degenerate draw, skip
-
-        trop_cell_weights(Yb, Wb, treated_units, lu, lt, delta, delta_unit, delta_time)
-
-        tau_b = .; mu_b = .; alpha_b = .; beta_b = .; L_b = .; iters = .
-        if (lnn >= .) {
-            trop_fit_wls(Yb, Wb, delta, tau_b, mu_b, alpha_b, beta_b)
-        }
-        else {
-            trop_fit_nuclear(Yb, Wb, delta, lnn, tol, max_iter,
-                             tau_b, mu_b, alpha_b, beta_b, L_b, iters)
-        }
-        tau_store[b] = tau_b
-    }
-
-    // SE over finite draws: sqrt((B-1)/B) * sample sd.
-    tau_store = select(tau_store, tau_store :< .)
-    B_eff = rows(tau_store)
-    if (B_eff < 2) {
-        errprintf("Too few finite bootstrap replications for an SE.\n")
-        return(.)
-    }
-    tbar = mean(tau_store)
-    ssq  = sum((tau_store :- tbar):^2)
-    // sample variance uses (B_eff - 1); the (B-1)/B factor matches the
-    // convention in the transcript / sdid.
-    return( sqrt((B_eff - 1) / B_eff) * sqrt(ssq / (B_eff - 1)) )
-}
-
-end
-
-mata:
-
 // Seeding: caller does `set seed` in Stata first; Mata runiform() shares the
 // stream, so the permutation is deterministic given that seed.
+mata:
 pointer(real colvector) rowvector trop_kfold_sets(real scalar Nc, real scalar K)
 {
     real colvector perm
@@ -1062,5 +1389,293 @@ void trop_cv_joint(
     lambda_unit = best_u
     lambda_time = best_t
     lambda_nn   = best_n     // may be missing (.) -> inf/WLS, correct
+}
+end
+
+mata:
+// theta_s. pooled (group time): |s - block_centre|; per-cell (group cell): |s - t|.
+// Periods are 1-based column indices; converted to 0-based internally to match the
+// paper/engine distance convention exactly.
+real rowvector trop_time_weights2(real scalar T, real rowvector tp1,
+                                  real scalar lt, real scalar pooled)
+{
+    real rowvector s0, tp0, d
+    real scalar    c
+    if (cols(tp1) == 0 | lt == 0) return(J(1, T, 1))
+    s0  = (0..(T-1))
+    tp0 = tp1 :- 1
+    if (pooled) {
+        c = (min(tp0) + max(tp0) + 1) / 2
+        d = abs(s0 :- c)
+    }
+    else {
+        d = abs(s0 :- tp0[1])
+    }
+    return(exp(-lt :* d))
+}
+end
+
+mata:
+// omega_j. pooled: RMS gap of unit j to the MEAN target path over non-target
+// periods. per-cell: RMS gap of unit j to the single target unit over their
+// COMMONLY-untreated periods (the paper's omega).
+real colvector trop_unit_weights2(real matrix Y, real matrix W,
+    real colvector tu1, real rowvector tp1, real scalar lu, real scalar pooled)
+{
+    real scalar    N, T, i
+    real rowvector avg, maskt, Wi
+    real colvector num, den, d
+    real matrix    M, diff2, sqdiff
+
+    N = rows(Y); T = cols(Y)
+    if (lu == 0) return(J(N, 1, 1))
+    if (pooled) {
+        avg    = mean(Y[tu1, .])                       // 1 x T mean target path
+        maskt  = J(1, T, 1)
+        maskt[1, tp1] = J(1, cols(tp1), 0)             // untreated = non-target periods
+        sqdiff = (J(N,1,1) * avg :- Y) :^ 2
+        num    = rowsum(sqdiff :* maskt)
+        d      = sqrt(num :/ sum(maskt))
+    }
+    else {
+        i     = tu1[1]
+        Wi    = W[i, .]
+        M     = (J(N,1,1) * (1 :- Wi)) :* (1 :- W)      // N x T commonly-untreated
+        diff2 = (J(N,1,1) * Y[i, .] :- Y) :^ 2
+        den   = rowsum(M)
+        den   = den :+ (den :== 0)                      // guard against /0
+        d     = sqrt(rowsum(M :* diff2) :/ den)
+    }
+    return(exp(-lu :* d))
+}
+end
+
+
+mata:
+// Estimate tau for ONE target (cell or block) as if it were the only treated
+// block. Front factor f = (1-W) + W*target_mask keeps every control cell and the
+// target's own treated cells, zero-weighting all OTHER treated cells. Treatment
+// column = target_mask; effective weight = f * (omega outer theta). Reuses the
+// suffstats WLS / nuclear solvers. cv_mode picks (tol,max_iter): point = 1e-8/20000,
+// CV = 1e-6/3000.
+real scalar trop_target_tau(real matrix Y, real matrix W, real matrix target_mask,
+    real colvector tu1, real rowvector tp1,
+    real scalar lu, real scalar lt, real scalar lnn,
+    real scalar pooled, real scalar cv_mode)
+{
+    real scalar    N, T, tau, tol, mxit
+    real colvector omega
+    real rowvector theta
+    real matrix    f, delta
+
+    N = rows(Y); T = cols(Y)
+    omega = trop_unit_weights2(Y, W, tu1, tp1, lu, pooled)
+    theta = trop_time_weights2(T, tp1, lt, pooled)
+    f     = (1 :- W) :+ W :* target_mask
+    delta = f :* (omega * theta)
+
+    tau = .
+    muh = .; ah = .; bh = .                            // transmorphic FE throwaways
+    if (lnn >= .) {
+        trop_fit_wls_suff(Y, target_mask, delta, tau, muh, ah, bh)
+    }
+    else {
+        Lh = .; ith = .
+        if (cv_mode) {
+			tol = 1e-6; mxit = 3000
+		} else {
+			tol = 1e-6; mxit = 5000
+		}
+        trop_fit_nuclear_suff(Y, target_mask, delta, lnn, tol, mxit, cv_mode,
+                              tau, muh, ah, bh, Lh, ith)
+    }
+    return(tau)
+}
+end
+
+mata:
+// Label treated cells into targets. Returns an N x T id matrix (0 = control,
+// g = target g), and sets G. group(cell): one id per treated cell. group(time):
+// contiguous treated runs; runs with identical (start,end) share an id (the
+// README's block construction), in first-encountered order.
+real matrix trop_build_groups(real matrix W, string scalar grp, real scalar G)
+{
+    real scalar N, T, i, t, a, b, g, nspell, k, found
+    real matrix gid, spells, keys
+
+    N = rows(W); T = cols(W)
+    gid = J(N, T, 0)
+
+    if (grp == "cell") {
+        g = 0
+        for (i = 1; i <= N; i++) {
+            for (t = 1; t <= T; t++) {
+                if (W[i,t] > 0) {
+                    g++
+                    gid[i,t] = g
+                }
+            }
+        }
+        G = g
+        return(gid)
+    }
+
+    // grp == "time"
+    spells = J(0, 3, .)                         // rows: (start, end, unit)
+    for (i = 1; i <= N; i++) {
+        t = 1
+        while (t <= T) {
+            if (W[i,t] > 0) {
+                a = t
+                while (t <= T) {
+                    if (W[i,t] == 0) break
+                    t++
+                }
+                b = t - 1
+                spells = spells \ (a, b, i)
+            }
+            else {
+                t++
+            }
+        }
+    }
+    nspell = rows(spells)
+    G = 0
+    keys = J(0, 2, .)                           // unique (start,end)
+    for (k = 1; k <= nspell; k++) {
+        a = spells[k,1]; b = spells[k,2]; i = spells[k,3]
+        found = 0
+        for (g = 1; g <= G; g++) {
+            if (keys[g,1] == a & keys[g,2] == b) {
+                found = g
+                break
+            }
+        }
+        if (found == 0) {
+            G++
+            keys = keys \ (a, b)
+            found = G
+        }
+        gid[i, (a..b)] = J(1, b - a + 1, found)
+    }
+    return(gid)
+}
+end
+
+mata:
+// ATT = treated-cell-weighted average of per-target taus. Rebuilds each target's
+// mask/units/periods from the id matrix. pooled selects the weight convention.
+real scalar trop_att(real matrix Y, real matrix W, real matrix gid, real scalar G,
+    real scalar lu, real scalar lt, real scalar lnn,
+    real scalar pooled, real scalar cv_mode,
+    real rowvector taus_out, real rowvector wts_out)
+{
+    real scalar    N, T, g
+    real matrix    mask
+    real colvector us
+    real rowvector per, sizes
+
+    N = rows(Y); T = cols(Y)
+    taus_out = J(1, G, .)
+    sizes    = J(1, G, .)
+    for (g = 1; g <= G; g++) {
+        mask = (gid :== g)
+        us   = selectindex(rowsum(mask) :> 0)   // treated units (colvector)
+        per  = selectindex(colsum(mask) :> 0)   // treated periods (rowvector)
+        sizes[g]    = sum(mask)
+        taus_out[g] = trop_target_tau(Y, W, mask, us, per, lu, lt, lnn, pooled, cv_mode)
+    }
+    wts_out = sizes :/ sum(sizes)
+    return( sum(wts_out :* taus_out) )
+}
+end
+
+mata:
+// Point-estimate ATT over targets (group cell|time), at resolved lambdas.
+// Posts the ATT, target count, and per-target tau/weight vectors back to Stata.
+void trop_point_att(real matrix Y, real matrix W, string scalar grp,
+                    real scalar lu, real scalar lt, real scalar lnn)
+{
+    real scalar    G, att, pooled
+    real matrix    gid
+    real rowvector taus, wts
+
+    G = .
+    gid    = trop_build_groups(W, grp, G)
+    pooled = (grp == "time")
+    taus = .; wts = .
+    att = trop_att(Y, W, gid, G, lu, lt, lnn, pooled, 0, taus, wts)
+
+    st_local("tau_hat",   strofreal(att))
+    st_local("n_targets", strofreal(G))
+    st_matrix("__trop_ttau", taus)
+    st_matrix("__trop_twt",  wts)
+}
+end
+
+mata:
+// numpy-style (type-7) linear-interpolation quantile, q in [0,1].
+real scalar trop_quantile(real colvector x, real scalar q)
+{
+    real colvector xs
+    real scalar    n, h, lo
+    xs = sort(x, 1)
+    n  = rows(xs)
+    if (n == 1) return(xs[1])
+    h  = (n - 1) * q + 1
+    lo = floor(h)
+    if (lo >= n) return(xs[n])
+    if (lo < 1)  return(xs[1])
+    return( xs[lo] + (h - lo) * (xs[lo+1] - xs[lo]) )
+}
+end
+
+mata:
+// Stratified block bootstrap of the per-target ATT: resample UNITS with
+// replacement within treated/control strata, rebuild groups on each draw, and
+// recompute the ATT at the SELECTED lambdas (cv_mode solve, matching the package).
+// Posts a percentile CI to r(); returns the bootstrap SE (sample sd, ddof=1).
+real scalar trop_bootstrap_att(
+    real matrix Y, real matrix W, string scalar grp,
+    real scalar lu, real scalar lt, real scalar lnn,
+    real scalar reps, real scalar level)
+{
+    real scalar    b, att_b, G, pooled, B_eff, a, n1, n0
+    real colvector trt_rows, ctrl_rows, samp_trt, samp_ctrl, samp_rows, boot
+    real rowvector taus, wts
+    real matrix    Yb, Wb, gid
+
+    trt_rows  = selectindex(rowsum(W) :> 0)
+    ctrl_rows = selectindex(rowsum(W) :== 0)
+    n1 = rows(trt_rows); n0 = rows(ctrl_rows)
+    if (n1 == 0 | n0 == 0) {
+        errprintf("Bootstrap requires both treated and control units.\n")
+        return(.)
+    }
+    pooled = (grp == "time")
+    boot = J(reps, 1, .)
+    for (b = 1; b <= reps; b++) {
+        samp_trt  = trt_rows[ ceil(n1 :* runiform(n1, 1)) ]
+        samp_ctrl = ctrl_rows[ ceil(n0 :* runiform(n0, 1)) ]
+        samp_rows = samp_trt \ samp_ctrl
+        Yb = Y[samp_rows, .]
+        Wb = W[samp_rows, .]
+        if (sum(Wb) == 0) continue
+        G = .
+        gid  = trop_build_groups(Wb, grp, G)
+        taus = .; wts = .
+        att_b = trop_att(Yb, Wb, gid, G, lu, lt, lnn, pooled, 1, taus, wts)
+        boot[b] = att_b
+    }
+    boot  = select(boot, boot :< .)
+    B_eff = rows(boot)
+    if (B_eff < 2) {
+        errprintf("Too few finite bootstrap replications for an SE.\n")
+        return(.)
+    }
+    a = (100 - level) / 2
+    st_numscalar("r(ci_lower)", trop_quantile(boot, a/100))
+    st_numscalar("r(ci_upper)", trop_quantile(boot, 1 - a/100))
+    return( sqrt( sum((boot :- mean(boot)):^2) / (B_eff - 1) ) )
 }
 end
