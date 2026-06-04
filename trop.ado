@@ -106,6 +106,10 @@ if (r(min)==1 & r(max)==1)==1 {
     exit 459
 }
 
+//DC: This restore below seems like it serves no purpose but adds time.  Can we confirm?
+//    The reason is that we "re-preserve" on line 179, but in between we do nothign that
+//    requires original data.  Seems more efficient to just stay preserved and pull out
+//    block on line 179
 *Restore dataset
 if (length("`if'")+length("`in'")>0) {
     restore
