@@ -246,7 +246,7 @@ variants attribute much of it to latent factor structure (0.04–0.06).
 
 ### Choosing tuning parameters via cross-validation
 
-If you leave any `lambda_*` unspecified, TROP selects it via leave-one-out
+If you leave any $\lambda$ unspecified, TROP selects it via leave-one-out
 cross-validation by default. loocv is deterministic, unlike resample and
 k-fold:
 
@@ -254,7 +254,7 @@ k-fold:
 trop y unit time w, cv(loocv) vce(noinference)
 ```
 
-which returns (loocv tuning takes ~6 min)
+which returns (note LOOCV tuning takes a few minutes)
 
 ```
 ----------------------------------------------------------------
