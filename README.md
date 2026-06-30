@@ -258,7 +258,21 @@ Choosing tuning parameters under group(time) by default:
 
 which returns
 ```
-
+----------------------------------------------------------------
+        TROP |  Triply Robust Panel estimator
+-------------+--------------------------------------------------
+         ATT |     0.02923
+             |  (no inference; vce(noinference))
+-------------+--------------------------------------------------
+     N units |         111
+   T periods |          48
+   N treated |          29
+-------------+--------------------------------------------------
+ lambda_unit |      0.0000
+ lambda_time |      0.7500
+   lambda_nn |         .01
+             |  (selected by resample CV)
+----------------------------------------------------------------
 ```
 
 
