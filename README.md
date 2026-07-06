@@ -314,7 +314,7 @@ time periods  start   end  units  cells        tau   cohort's units
       t41_48     41    48      5     40    -0.0435   107 108 109 110 111
 ```
  
-The per-cohort effects are also returned in `e()`:
+The per-cohort effects are also returned in `e(group_tau)` if you have not used the detail option:
  
 ```s
 matrix list e(group_tau)
