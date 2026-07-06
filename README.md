@@ -301,7 +301,7 @@ u101   0.0316   0.0408   0.0725   0.0636   0.0188  -0.2378  -0.2742  -0.2865  -0
 (output truncated)
 ```
  
-LOOCV under `group(cell)` performs poorly under block adoption relative to resample under group(time). Looking at the heterogenous treatment effects under `group(cell)`, we can see that units further from the onset of treatment have larger treatment effects. This is because LOOCV estimates placebo effects using control units which are surrounded by adjacent donor units. CV minimises the criterion on this basis, and chooses lambdas which are large (`lambda_unit=2` and `lambda_time=4`) which heavily weights nearby units. However, actual treated units in a block sit far from control units (i.e. up to 19 periods). Therefore, the lambdas chosen using LOOCV result in a much higher ATT than `cv(resample)`, because they give very little weight to the nearest control units. 
+LOOCV under `group(cell)` performs poorly under block adoption relative to resample under group(time). Looking at the heterogenous treatment effects under `group(cell)`, we can see that units further from the onset of treatment have larger treatment effects. This is because LOOCV estimates placebo effects using control units which are surrounded by adjacent donor units. CV minimises the criterion on this basis, and chooses lambdas which are large (`lambda_unit=2` and `lambda_time=4`) which heavily weights nearby units. However, actual treated units in a block sit far from control units (i.e. up to 19 periods). Therefore, the lambdas chosen using LOOCV result in a much higher ATT than `cv(resample)`, because they give very little weight to the control units which sit far from treated units. 
  
 ### Staggered adoption
  
