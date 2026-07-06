@@ -78,12 +78,13 @@ trop Y S T D [if] [in] [, group(type) lambda_unit(#) lambda_time(#) lambda_nn(#)
 + lambda_time(): tuning parameter for time weights $\theta_s$. Larger values concentrate weight on periods near treatment; 0 weights all periods equally. If omitted, chosen by cross-validation.
 + lambda_nn(): tuning parameter for the nuclear-norm penalty on the low-rank component $\mathbf{L}$. Larger values shrink $\mathbf{L}$ toward low rank; **inf** (or **.**) drops $\mathbf{L}$, reducing TROP to weighted two-way fixed effects. If omitted, chosen by cross-validation.
 + cv(method [search] [, suboptions]): cross-validation scheme used to choose any lambda left unspecified. The first word is the method, the optional second word is the search type, and tuning knobs follow a comma.
-  - *method*: **loocv** leave-one-out (default under `group(cell)`); **resample** random placebo-treated sets drawn from the control panel (default under `group(time)`); **kfold** controls partitioned into folds, each treated once. **resample** and **kfold** require `group(time)`, **loocv** require `group(cell)`. 
+  - *method*: **loocv** leave-one-out (default under `group(cell)`); **resample** random placebo-treated sets drawn from the control panel (default under `group(time)`); **kfold** controls partitioned into folds, each treated once. **resample** and **kfold** require `group(time)`, **loocv** requires `group(cell)`. 
   - *search*: **cycle** (default) coordinate descent; **joint** full grid search.
   - *suboptions*:
     - trials(#): placebo draws under **resample** (default 200; ignored otherwise).
     - ntreated(#): placebo-treated units per **resample** draw (defaults to number of treated units in panel).
     - folds(#): number of folds under **kfold** (default 5; ignored otherwise).
+    - cells(#): number of randomly sampled control cells scored under **loocv** (default all control cells; ignored otherwise). Useful for large panels where full LOOCV is slow.
     - seed(#): seed under resample and kfold draws (default 0). Under LOOCV it has an effect only with cells(#) option. LOOCV with all control cells is deterministic.
     - unit_grid(numlist): candidate $\lambda_\text{unit}$ values. Default `0 0.1 0.2 0.3 0.5 0.8 1.2 1.6 2`.
     - time_grid(numlist): candidate $\lambda_\text{time}$ values. Default `0 0.025 0.05 0.1 0.2 0.35 0.5 0.75 1 2 4`.
@@ -101,7 +102,7 @@ There are two options to group estimands:
 
 + Under `group(cell)` TROP estimates a separate effect for every treated unit-time cell and averages them. This is faithful to the paper and provides heterogeneous treatment effects, but is computationally expensive relative to grouping estimands.
 
-+ Under `group(time)` (default), treated cells that share the **same uninterrupted treatment period** are pooled into a block across time, blocks which share the same uninterrupted treatment period are further pooled together across units, and the treatment effect is averaged. For example, simultaneous adoption which switches on permanently results in one estimand for $\tau$, whereas staggered adoption results in as many estimands as there are cohorts as usual. Time weights are determined using the mid-point of the block.
++ Under `group(time)` (default), treated cells that share the **same uninterrupted treatment period** are pooled into a block across time, blocks which share the same uninterrupted treatment period are further pooled across units, and the treatment effect is averaged. For example, simultaneous adoption which switches on permanently results in one estimand for $\tau$, whereas staggered adoption results in as many estimands as there are cohorts as usual. Time weights are determined using the mid-point of the block.
 
 #### Example
 
@@ -144,7 +145,7 @@ In these examples, we use Penn Word Tables (`trop_panel_penn.csv`) to conduct a 
 import delimited "trop_panel_penn.csv", varnames(1) clear
 xtset unit time
 ```
-Next, we will generate four different treatment patterns. The patterns are: simultaneous adoption with a single treated period, simultaneous adoption with ten treated periods, staggered adoption, and general pattern assignment.
+Next, we will generate four different treatment patterns. The patterns are: one treated unit with a single treated period, simultaneous adoption, staggered adoption, and general pattern assignment.
 
 ```s
 gen w_single = (unit >= 111) & (time == 40) //Only one treated time period and one treated unit
@@ -162,7 +163,7 @@ gen w_gen = (unit >= 102) & (runiform() < 0.2) //We choose the same treated unit
 
 ### Single treated period
  
-First, we estimate the effects for one treated unit treated in final period. Grouping by cell and time will be equivalent here under the same lambdas, given only one unit is treated at one time such that no estimands can be grouped. Let's see how the cross-validation results compare:
+First, we estimate the effects for one treated unit treated in final period. Grouping by cell and time will be equivalent here under the same lambdas, given that no estimands can be grouped with one treated unit at a specific time. Let's see how the cross-validation results compare:
  
 ```s
 trop y unit time w_single, cv(resample, seed(1))
@@ -208,7 +209,7 @@ trop y unit time w_single, group(cell) cv(loocv, cells(200) seed(1))
              |  (selected by loocv CV)
 ----------------------------------------------------------------
 ```
-LOOCV appears to choose lambdas which result in a lower RMSE than resample. The values are higher which means it prioritises a short-term horizon. 
+LOOCV appears to choose lambdas which result in a lower RMSE than resample.
  
 ### Block adoption
  
@@ -263,7 +264,7 @@ trop y unit time w_block, group(cell) cv(loocv, cells(200) seed(1))
 (270 per-cell effects: e(group_grid) [unit x time], e(group_tau), e(group_info))
 ```
  
-To study the heterogenous treatment effects more closely, use `e(group_grid)`:
+This null effect appears to be very high. To study the heterogenous treatment effects more closely, use `e(group_grid)`:
  
 ```s
 matrix list e(group_grid), format(%9.4f)
@@ -280,7 +281,7 @@ u101   0.0316   0.0408   0.0725   0.0636   0.0188  -0.2378  -0.2742  -0.2865  -0
 (output truncated)
 ```
  
-LOOCV under `group(cell)` performs poorly under block adoption relative to resample under group(time). Looking at the heterogenous treatment effects under `group(cell)`, we can see that units further from the onset of treatment have larger treatment effects. This is because LOOCV estimates placebo effects using control units which are surrounded by adjacent donor units. CV minimises the criterion on this basis, and chooses lambdas which are large (`lambda_unit=2` and `lambda_time=4`) which heavily weights nearby units. However, actual treated units in a block sit far from control units (i.e. up to 19 periods). Therefore, the lambdas chosen using LOOCV result in a much higher ATT than `cv(resample)`. Resample under `group(time)` has a lower bias, because the CV uses the actual treatment pattern on a subset of never-treated control units from the panel (and resamples this).
+LOOCV under `group(cell)` performs poorly under block adoption relative to resample under group(time). Looking at the heterogenous treatment effects under `group(cell)`, we can see that units further from the onset of treatment have larger treatment effects. This is because LOOCV estimates placebo effects using control units which are surrounded by adjacent donor units. CV minimises the criterion on this basis, and chooses lambdas which are large (`lambda_unit=2` and `lambda_time=4`) which heavily weights nearby units. However, actual treated units in a block sit far from control units (i.e. up to 19 periods). Therefore, the lambdas chosen using LOOCV result in a much higher ATT than `cv(resample)`. Resample under `group(time)` has a lower bias, because the CV uses the actual treatment pattern on a subset of never-treated control units from the panel.
  
 ### Staggered adoption
  
@@ -314,7 +315,7 @@ time periods  start   end  units  cells        tau   cohort's units
       t41_48     41    48      5     40    -0.0435   107 108 109 110 111
 ```
  
-The per-cohort effects are also returned in `e(group_tau)` if you have not used the detail option:
+The per-cohort effects are also returned in `e(group_tau)` if you have not used the detail option (but the cohort's units are not):
  
 ```s
 matrix list e(group_tau)
@@ -327,7 +328,7 @@ r1  -.04527924   .05947124  -.04354185
 ```
 ### General assignment
  
-Under `w_gen`, treatment switches on and off at random such that units. Shared treated periods with the same (start, end) are still pooled across units, whereas single units are simply its own estimand. Here the treated units generate 51 distinct estimands:
+Under general assignment, treatment switches on and off at random. Under `group(time)`, treated periods with the same start and end are pooled across units and single units simply remain their own estimand. Here the treated units generate 51 distinct estimands:
  
 ```s
 trop y unit time w_gen, lambda_unit(0.3) lambda_time(0.5) lambda_nn(0.025)
