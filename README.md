@@ -47,15 +47,15 @@ $$\omega_j^{i,t}(\lambda) = \exp\left(-\lambda_\text{unit} \cdot \left(\frac{\su
 
 ### Tuning via cross-validation
 
-Any $\lambda$ you leave unspecified is chosen by **cross-validation**. The default scheme depends on grouping: under the default `group(time)`, TROP uses placebo resampling (`cv(resample)`); under `group(cell)`, it uses leave-one-out (`cv(loocv)`). The LOOCV criterion exploits the fact that the estimated treatment effect on any control unit---permuted as if it were the true treated unit---should be close to zero. Formally, it minimizes:
+Users can specify lambda values directly with `lambda_unit()`, `lambda_time()`, and `lambda_nn()`. Any $\lambda$ left unspecified is chosen by cross-validation. CV repeatedly estimates a placebo treatment effect for control units under different combinations of lambdas, to find the combination of lambdas which minimises placebo average treatment effects. The default scheme depends on grouping. Under the default `group(time)`, TROP uses placebo resampling `cv(resample)`. Under `group(cell)`, it uses leave-one-out cross-validation `cv(loocv)`. 
 
+The placebo-resampling methods `cv(resample)` and `cv(kfold)` use placebo cross-validation. For `cv(resample)`, the idea is to filter data to control units, assign the treatment pattern of treated units to a subset of control units, and estimate the average treatment effect per panel. `ntrials` specifies the number of trials under which this is done. We also provide a `cv(kfold)` option which partitions the controls into K folds, assigns the entire fold treatment status (recycling treated unit patterns), and uses held-out units as the donor pool.
+
+The LOOCV criterion for `cv(loocv)` exploits the fact that the estimated treatment effect on any control unit---permuted as if it were the true treated unit---should be close to zero. Formally, it estimates a treatment effect for each unit-cell, and minimizes
 $$Q(\lambda) = \sum_{i,t} (1 - W_{it})\,\bigl(\hat\tau_{it}^\text{loocv}(\lambda)\bigr)^2$$
+over a grid, cycling through the three parameters in sequence. 
 
-over a grid, cycling through the three parameters in sequence. Users can also specify lambda values directly with `lambda_unit()`, `lambda_time()`, and `lambda_nn()`. Any $\lambda$ left unspecified is chosen by cross-validation.
-
-The placebo-resampling methods `cv(resample)` and `cv(kfold)` use placebo cross-validation as described in the [TROP Python Tutorial](https://github.com/ostasovskyi/TROP-Estimator/blob/main/notebooks/tutorial.ipynb). The idea is to assign the observed treatment pattern of treated units to a set of control units. The set of control units can either be chosen under `cv(resample)` which draws `ntrials` random control samples, or `cv(kfold)` which partitions the controls into K folds.
-
-> **Note on scale.** The outcome is internally standardized ($(Y-\text{mean})/\text{SD}$) before fitting, and $\tau$, the standard error, and the confidence interval are mapped back to the raw outcome scale. The $\lambda$ grids and the returned `lambda_unit`/`lambda_time`/`lambda_nn` are therefore on the **standardized-outcome scale**.
+> **Note** The outcome is standardized ($(Y-\text{mean})/\text{SD}$) before fitting, and $\tau$, the standard error, and the confidence interval are mapped back to the raw outcome scale. The $\lambda$ grids and the returned `lambda_unit`/`lambda_time`/`lambda_nn` are therefore on a standardized-outcome scale. 
 
 
 ## Inputs
@@ -93,36 +93,13 @@ trop Y S T D [if] [in] [, group(type) lambda_unit(#) lambda_time(#) lambda_nn(#)
 + level(): confidence level for the reported interval (default 95).
 + verbose: display cross-validation and bootstrap progress.
 
-## Grouping Estimands: Time-block grouping under `group(time)`
+## Grouping Estimands: Per-cell vs Time
 
-Under (`group(cell)`) TROP estimates a separate effect for every treated unit-time cell and averages them. Under `group(time)` (default), treated cells that share the **same uninterrupted treatment period** are pooled into a single block, one effect is estimated per block, and the treatment effect of blocks is averaged. For example, simultaneous adoption which switches on permanently results in one estimand for $\tau$, and staggered adoption result in as many groups as there are adoption cohorts as usual.  
+There are two options to group estimands:
 
-For each unit, find its uninterrupted groups of treated periods. Two runs belong to the same treatment block cohort $g$ if they have identical start and end dates $(a_g, b_g)$. The block is the set of treated cells covered by that timing:
+Under `group(cell)` TROP estimates a separate effect for every treated unit-time cell and averages them. This is faithful to the paper and provides heterogeneous treatment effects, but is computationally expensive relative to grouping estimands. 
 
-```math
-\mathcal{D}_g = \{(i,t) \mid t \in [a_g, b_g],\; W_{it} = 1\}.
-```
-
-Each block replaces the cell indicator with a block indicator $I^g_{js} = 1\{(j,s)\in\mathcal{D}_g\}$ and solves
-
-```math
-\widehat{\tau}_g(\lambda)
-= \arg\min_{\tau_g}\,\min_{\alpha,\beta,L}
-\sum_{j,s}
-\bigl[(1-W_{js}) + W_{js}I^g_{js}\bigr]\,
-\omega^g_j\,\theta^g_s\,
-\bigl(Y_{js} - \alpha_j - \beta_s - L_{js} - \tau_g I^g_{js}\bigr)^2
-+ \lambda_{nn}\lVert L\rVert_*.
-```
-
-The weight $(1-W_{js}) + W_{js}I^g_{js}$ keeps every untreated cell and the treated cells in block $g$, while zero-weighting treated cells from other blocks, so each block is estimated as if it were the only treated block. The grouped ATT is the treated-cell-weighted average of the block effects:
-
-```math
-\widehat{\tau}_{\mathrm{time}}
-= \sum_{g=1}^{G} \pi_g\,\widehat{\tau}_g,
-\qquad
-\pi_g = \frac{|\mathcal{D}_g|}{|\mathcal{D}|}.
-```
+Under `group(time)` (default), treated cells that share the **same uninterrupted treatment period** are pooled into a block across time, blocks which share the same uninterrupted treatment period are further pooled together across units, and the treatment effect is averaged. For example, simultaneous adoption which switches on permanently results in one estimand for $\tau$, whereas staggered adoption results in as many estimands as there are cohorts as usual. 
 
 #### Example
 
@@ -139,7 +116,7 @@ i{=}5 & 0 & 0 & 0 & 0 & 0 & 0
 ```
 
 - `group(cell)`: 11 separate effects, one per treated cell, averaged equally.
-- `group(time)`: contiguous spells are `{3,4}` for units 1 and 2 (identical, so pooled), `{4,5,6}` for unit 3, and `{2,3}` plus `{5,6}` for unit 4 — giving four blocks of sizes 4, 3, 2, 2:
+- `group(time)`: treatment periods are `{3,4}` for units 1 and 2 (identical, so pooled), `{4,5,6}` for unit 3, and `{2,3}` plus `{5,6}` for unit 4 — giving four blocks of sizes 4, 3, 2, 2:
 
 ```math
 G =
@@ -158,25 +135,274 @@ i{=}5 & 0 & 0 & 0 & 0 & 0 & 0
 = \frac{4\widehat{\tau}_1 + 3\widehat{\tau}_2 + 2\widehat{\tau}_3 + 2\widehat{\tau}_4}{11}.
 ```
 
-**In short:** `group(cell)` estimates one effect per treated cell; `group(time)` estimates one effect per shared-uninterrupted treatment spell, then averages by treated-cell count.
-
 ## Examples
 
-The examples use the long-form panel in the repository (`trop_panel_penn.csv`), with columns `unit time y w`. Load and `xtset` first:
-
+In these examples, we use Penn Word Tables (`trop_panel_penn.csv`) to conduct a null effect study. First, load in the data:
 ```s
 import delimited "trop_panel_penn.csv", varnames(1) clear
 xtset unit time
 ```
+Next, we will generate four different treatment patterns. The patterns are: simultaneous adoption with a single treated period, simultaneous adoption with ten treated periods, staggered adoption, and general pattern assignment.
 
-With all three regularizers off, TROP reduces to textbook DID/TWFE:
+```s
+gen w_single = (unit >= 102) & (time == 40) //Only one treated time period
 
+gen w_block = (unit >= 97) & (time >= 31) //Multiple treated periods
+
+gen w_stag = 0
+replace w_stag = 1 if inrange(unit,  97, 101) & time >= 21 //Three different treatment cohorts
+replace w_stag = 1 if inrange(unit, 102, 106) & time >= 31
+replace w_stag = 1 if inrange(unit, 107, 111) & time >= 41
+
+set seed 42
+gen w_gen = (unit >= 102) & (runiform() < 0.2) //We choose the same treated units as before, and given treated-unit cell has a 20% chance of being assigned treatment status.
+```
+
+### Single treated period
+ 
+Ten units are treated in the last period. All ten cells share the same single-period spell, so `group(time)` pools them into one estimand:
+ 
+```s
+trop y unit time w_single, cv(resample, seed(1))
+```
+ 
+```
+----------------------------------------------------------------
+        TROP |  Triply Robust Panel estimator
+-------------+--------------------------------------------------
+         ATT |    -0.00350
+             |  (no inference; vce(noinference))
+-------------+--------------------------------------------------
+     N units |         111
+   T periods |          48
+   N treated |          10
+-------------+--------------------------------------------------
+ lambda_unit |      0.5000
+ lambda_time |      2.0000
+   lambda_nn |         .05
+             |  (selected by resample CV)
+----------------------------------------------------------------
+```
+ 
+Under `group(cell)`, the same ten cells are instead estimated one at a time and averaged:
+ 
+```s
+trop y unit time w_single, group(cell) cv(loocv, cells(200) seed(1))
+```
+ 
+```
+----------------------------------------------------------------
+        TROP |  Triply Robust Panel estimator
+-------------+--------------------------------------------------
+         ATT |    -0.00497
+             |  (no inference; vce(noinference))
+-------------+--------------------------------------------------
+     N units |         111
+   T periods |          48
+   N treated |          10
+-------------+--------------------------------------------------
+ lambda_unit |      2.0000
+ lambda_time |      4.0000
+   lambda_nn |        .025
+             |  (selected by loocv CV)
+----------------------------------------------------------------
+(10 per-cell effects: e(group_grid) [unit x time], e(group_tau), e(group_info))
+```
+ 
+The heterogeneous per-cell effects are returned in `e(group_tau)`:
+ 
+```s
+matrix list e(group_tau)
+```
+ 
+```
+e(group_tau)[1,10]
+      u102_t40    u103_t40    u104_t40    u105_t40    u106_t40    u107_t40    u108_t40    u109_t40    u110_t40    u111_t40
+r1  -.03660509   .00515498  -.00485746   .00289555   .00428519   .00550833  -.03699675  -.00352262  -.00039041   .01480625
+```
+ 
+### Block adoption
+ 
+Under block adoption, units are treated simultaneously in the final 18 periods. Under `group(time)` this is one pooled spell of 270 cells (15 units × 18 periods):
+ 
+```s
+trop y unit time w_block, cv(resample, seed(1))
+```
+
+which returns 
+
+```
+----------------------------------------------------------------
+        TROP |  Triply Robust Panel estimator
+-------------+--------------------------------------------------
+         ATT |     0.01046
+             |  (no inference; vce(noinference))
+-------------+--------------------------------------------------
+     N units |         111
+   T periods |          48
+   N treated |          15
+-------------+--------------------------------------------------
+ lambda_unit |      0.0000
+ lambda_time |      0.0000
+   lambda_nn |          .1
+             |  (selected by resample CV)
+----------------------------------------------------------------
+``` Under `group(cell)`, the same pattern produces 270 separate effects:
+ 
+```s
+trop y unit time w_block, group(cell) cv(loocv, cells(200) seed(1))
+```
+ 
+```
+----------------------------------------------------------------
+        TROP |  Triply Robust Panel estimator
+-------------+--------------------------------------------------
+         ATT |    -0.23351
+             |  (no inference; vce(noinference))
+-------------+--------------------------------------------------
+     N units |         111
+   T periods |          48
+   N treated |          15
+-------------+--------------------------------------------------
+ lambda_unit |      2.0000
+ lambda_time |      4.0000
+   lambda_nn |        .025
+             |  (selected by loocv CV)
+----------------------------------------------------------------
+(270 per-cell effects: e(group_grid) [unit x time], e(group_tau), e(group_info))
+```
+ 
+To study the heterogenous treatment effects more closely, use `e(group_grid)`:
+ 
+```s
+matrix list e(group_grid), format(%9.4f)
+```
+ 
+```
+e(group_grid)[15,18]
+          t31      t32      t33      t34      t35      t36      t37      t38      t39      t40      t41      t42      t43      t44
+ u97  -0.0019   0.0033  -0.0026  -0.0496  -0.1380  -0.9494  -1.0950  -1.1172  -1.1144  -1.1134  -1.1222  -1.0684  -0.9989  -0.9882
+ u98   0.0233   0.0063  -0.0426  -0.2155  -0.2160  -0.8222  -0.9198  -0.9473  -0.9809  -0.9648  -0.9726  -0.9572  -0.9014  -0.9146
+ u99   0.0715   0.1253   0.1810   0.2353   0.2291  -0.0618  -0.1138  -0.1597  -0.2089  -0.1765  -0.1540  -0.1198  -0.0469  -0.0502
+u100  -0.0079  -0.0014  -0.0321  -0.0560  -0.0522   0.0158   0.0359   0.0387   0.0603   0.1105   0.1458   0.1856   0.2672   0.2926
+u101   0.0316   0.0408   0.0725   0.0636   0.0188  -0.2378  -0.2742  -0.2865  -0.2820  -0.2435  -0.2214  -0.1813  -0.1264  -0.1366
+(output truncated)
+```
+ 
+Cross-validation under `group(cell)`, i.e. LOOCV, performs poorly under block adoption relative to group(cell). Studying the heterogenous treatment effects from `group(cell)`, shows that the further a unit is from the onset of treatment, the larger (and more bias) the treatment effect. The issue is that LOOCV estimates placebo effects using control units whose donor units are adjacent to the placebo cell. CV minimises the criterion on this basis, and chooses lambdas which are large (`lambda_unit=2` and `lambda_time=4`). This is effectively a short-horizon for time weights. However, actual treated units within the block sit far from control units (i.e. up to 19 periods). As a result, the lambdas chosen using LOOCV result in a much higher ATT than resample.
+ 
+### Staggered adoption
+ 
+Next, we study staggered adoption with three cohorts of five units. Under `group(time)`, the `detail` option prints a summary which includes which units are included in each cohort:
+ 
+```s
+trop y unit time w_stag, cv(resample, seed(1)) detail
+```
+ 
+```
+----------------------------------------------------------------
+        TROP |  Triply Robust Panel estimator
+-------------+--------------------------------------------------
+         ATT |    -0.01011
+             |  (no inference; vce(noinference))
+-------------+--------------------------------------------------
+     N units |         111
+   T periods |          48
+   N treated |          15
+-------------+--------------------------------------------------
+ lambda_unit |      0.0000
+ lambda_time |      0.0000
+   lambda_nn |        .005
+             |  (selected by resample CV)
+----------------------------------------------------------------
+(3 per-spell effects in e(group_tau), e(group_weight), e(group_info), e(group_units))
+ 
+time periods  start   end  units  cells        tau   cohort's units
+      t21_48     21    48      5    140    -0.0453   97 98 99 100 101
+      t31_48     31    48      5     90     0.0595   102 103 104 105 106
+      t41_48     41    48      5     40    -0.0435   107 108 109 110 111
+```
+ 
+The per-cohort effects are also returned in `e()`:
+ 
+```s
+matrix list e(group_tau)
+```
+ 
+```
+e(group_tau)[1,3]
+        t21_48      t31_48      t41_48
+r1  -.04527924   .05947124  -.04354185
+```
+ 
+```s
+matrix list e(group_info)
+```
+ 
+```
+e(group_info)[3,4]
+          start      end  n_units  n_cells
+t21_48       21       48        5      140
+t31_48       31       48        5       90
+t41_48       41       48        5       40
+```
+ 
+### General assignment
+ 
+Under `w_gen`, treatment switches on and off at random such that units. Shared treated periods with the same (start, end) are still pooled across units, whereas single units are simply its own estimand. Here the treated units generate 51 distinct estimands:
+ 
+```s
+trop y unit time w_gen, lambda_unit(0.3) lambda_time(0.5) lambda_nn(0.025)
+```
+ 
+```
+----------------------------------------------------------------
+        TROP |  Triply Robust Panel estimator
+-------------+--------------------------------------------------
+         ATT |     0.00129
+             |  (no inference; vce(noinference))
+-------------+--------------------------------------------------
+     N units |         111
+   T periods |          48
+   N treated |          10
+-------------+--------------------------------------------------
+ lambda_unit |      0.3000
+ lambda_time |      0.5000
+   lambda_nn |        .025
+----------------------------------------------------------------
+(51 per-spell effects in e(group_tau), e(group_weight), e(group_info), e(group_units))
+```
+ 
+`e(group_info)` records each estimands start and end time, as well as units:
+ 
+```s
+matrix list e(group_info)
+```
+ 
+```
+e(group_info)[51,4]
+          start      end  n_units  n_cells
+t10_12       10       12        1        3
+t18_18       18       18        2        2
+t22_22       22       22        1        1
+t28_28       28       28        2        2
+t33_35       33       35        1        3
+t39_40       39       40        1        2
+t45_45       45       45        1        1
+  t1_1        1        1        2        2
+(output truncated)
+```
+ 
+### From TWFE to TROP
+ 
+We now return to the original treatment variable `w` in `trop_panel_penn.csv`, which uses block adoption. With all three regularizers off, TROP reduces to textbook DID/TWFE:
+ 
 ```s
 trop y unit time w, lambda_unit(0) lambda_time(0) lambda_nn(inf)
 ```
-
+ 
 which returns
-
+ 
 ```
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
@@ -194,13 +420,13 @@ which returns
 ----------------------------------------------------------------
 ```
 No distance weights with a nuclear penalty i.e. matrix completion:
-
+ 
 ```s
 trop y unit time w, lambda_unit(0) lambda_time(0) lambda_nn(0.6)
 ```
-
+ 
 which returns
-
+ 
 ```
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
@@ -217,15 +443,15 @@ which returns
    lambda_nn |          .6
 ----------------------------------------------------------------
 ```
-
+ 
 Turning on both unit and time weight dimensions AND low-rank adjustment
-
+ 
 ```s
 trop y unit time w, lambda_unit(0.3) lambda_time(0.325) lambda_nn(0.1)
 ```
-
+ 
 which returns
-
+ 
 ```
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
@@ -242,40 +468,10 @@ which returns
    lambda_nn |          .1
 ----------------------------------------------------------------
 ```
-
+ 
 The estimate changes a lot across these specifications: unadjusted TWFE assigns the
 entire treated/control gap to the effect (0.22), while the weighted and low-rank
 variants attribute much of it to latent factor structure (0.04–0.06).
-
-### Choosing tuning parameters via cross-validation
-
-If you leave any $\lambda$ unspecified, TROP selects it via resample (under group(time)) or LOOCV (under group(cell)).
-
-Choosing tuning parameters under group(time) by default:
-```s
-. trop y unit time w, cv(resample, trials(50) seed(0))
-```
-
-which returns
-```
-----------------------------------------------------------------
-        TROP |  Triply Robust Panel estimator
--------------+--------------------------------------------------
-         ATT |     0.03314
-             |  (no inference; vce(noinference))
--------------+--------------------------------------------------
-     N units |         111
-   T periods |          48
-   N treated |          29
--------------+--------------------------------------------------
- lambda_unit |      0.3000
- lambda_time |      0.5000
-   lambda_nn |        .025
-             |  (selected by resample CV)
-----------------------------------------------------------------
-
-```
-
 
 ### Inference
 
