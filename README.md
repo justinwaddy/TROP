@@ -47,11 +47,12 @@ $$\omega_j^{i,t}(\lambda) = \exp\left(-\lambda_\text{unit} \cdot \left(\frac{\su
 
 ### Tuning via cross-validation
 
-Users can specify lambda values directly with `lambda_unit()`, `lambda_time()`, and `lambda_nn()`. Any $\lambda$ left unspecified is chosen by cross-validation. CV repeatedly estimates a placebo treatment effect for control units under different combinations of lambdas, to find the combination of lambdas which minimises placebo average treatment effects. The default scheme depends on grouping. Under the default `group(time)`, TROP uses placebo resampling `cv(resample)`. Under `group(cell)`, it uses leave-one-out cross-validation `cv(loocv)`. 
+Users can specify lambda values directly with `lambda_unit()`, `lambda_time()`, and `lambda_nn()`. Any $\lambda$ left unspecified is chosen by cross-validation. CV repeatedly estimates a placebo treatment effect for control units under different combinations of lambdas, to find the combination of lambdas which minimises placebo average treatment effects.
 
-The placebo-resampling methods `cv(resample)` and `cv(kfold)` use placebo cross-validation. For `cv(resample)`, the idea is to filter data to control units, assign the treatment pattern of treated units to a subset of control units, and estimate the average treatment effect per panel. `ntrials` specifies the number of trials under which this is done. We also provide a `cv(kfold)` option which partitions the controls into K folds, assigns the entire fold treatment status (recycling treated unit patterns), and uses held-out units as the donor pool.
++ Under `group(time)`, the placebo-resampling methods `cv(resample)` (default) and `cv(kfold)` use placebo cross-validation. For `cv(resample)`, we filter the panel to pure control units, assign the treatment pattern of treated units to a subset of control units, and estimate the average treatment effect per panel. `ntrials` specifies the number of trials. We also provide a `cv(kfold)` option which partitions the controls into `folds=5` (default) folds, assigns treatment to the entire fold (recycling treated unit patterns), and uses held-out units from other folds as the donor pool. The score for resample and k-fold is $$Q(\lambda) = \frac{1}{B}\sum_{b=1}^{B} \bigl(\hat\tau^{\text{placebo}}_{b}(\lambda)\bigr)^2$$ where B is the number of trials or folds for each CV method respectively.
 
-The LOOCV criterion for `cv(loocv)` exploits the fact that the estimated treatment effect on any control unit---permuted as if it were the true treated unit---should be close to zero. Formally, it estimates a treatment effect for each unit-cell, and minimizes
+
++ Under `group(cell)`, the LOOCV criterion for `cv(loocv)` exploits the fact that the estimated treatment effect on any control unit---permuted as if it were the true treated unit---should be close to zero. Formally, it estimates a treatment effect for each control unit-cell, and minimizes
 $$Q(\lambda) = \sum_{i,t} (1 - W_{it})\,\bigl(\hat\tau_{it}^\text{loocv}(\lambda)\bigr)^2$$
 over a grid, cycling through the three parameters in sequence. 
 
