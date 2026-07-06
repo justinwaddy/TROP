@@ -1,10 +1,11 @@
 *! trop: Triply Robust Panel Estimators
-*! Version 0.2.4 July 4, 2026
+*! Version 0.2.5 July 6, 2026
 *! Author: Clarke Damian, Justin Waddy
 *! dclarke@fen.uchile.cl, j.waddy@exeter.ac.uk
 
 /*
 Versions
+0.2.5 July 6, 2026: Added 'detail' option which provides further details on heterogeneous treatment effects and the units in a given cohort.
 0.2.4 July 4, 2026: Resample and K-fold now use the pattern of treatment from treated units instead of entire block. Pooled time weights 
       now center on the block midpoint (min+max)/2, aligning with dist(s,t)=|t-s| (previously half-period late). Single treated 
       periods with the same lambdas now result in the same estimates under group(time) and group(cell).
@@ -38,6 +39,7 @@ syntax varlist(min=4 max=4) [if] [in],
     vce(string)
     level(integer 95)
     verbose
+    detail
     ]
     ;
 #delimit cr
@@ -59,7 +61,6 @@ else                   local cv_method "loocv"
 local cv_search "cycle"
 local cv_seed   0
 local ntrials   200
-local ntreated  1
 local kfold     5
 local ncells    0
 local unit_grid ""
@@ -75,7 +76,7 @@ if `"`cv'"' != "" {
     if "`_s'" != "" local cv_search "`_s'"
     if `_cc' != 0 {
         local _cvsub = substr(`"`cv'"', `_cc'+1, .)
-        foreach _k in trials ntreated folds seed cells unit_grid time_grid nn_grid {
+        foreach _k in trials folds seed cells unit_grid time_grid nn_grid {
             local _p = strpos(`"`_cvsub'"', "`_k'(")
             if `_p' > 0 {
                 local _rest = substr(`"`_cvsub'"', `_p' + length("`_k'("), .)
@@ -84,7 +85,6 @@ if `"`cv'"' != "" {
             }
         }
         if "`_trials'"      != "" local ntrials   = `_trials'
-        if "`_ntreated'"    != "" local ntreated  = `_ntreated'
         if "`_folds'"       != "" local kfold     = `_folds'
         if "`_seed'"        != "" local cv_seed   = `_seed'
         if "`_cells'"       != "" local ncells    = `_cells'
@@ -272,7 +272,10 @@ qui egen `unit_tag' = tag(`2')
 
 qui levelsof `unit_row' if `ever_treated' == 1 & `unit_tag' == 1, local(treated_rows)
 local n_treated : word count `treated_rows'
-if "`_ntreated'" == "" local ntreated = `n_treated'
+local ntreated = `n_treated'
+
+qui levelsof `2', local(__trop_uvals)
+qui levelsof `3', local(__trop_tvals)
 
 drop `ever_treated' `unit_row' `unit_tag'
 
@@ -307,7 +310,6 @@ if "`nn_grid'"   == "" local nn_grid   "`default_nn_grid'"
 if `kfold' <= 0 local kfold = 5
 
 if `ntrials'  <= 0 local ntrials  = 200
-if `ntreated' <= 0 local ntreated = 1
 
 *Run CV if any lambda is unspecified*
 local need_cv = (1 - `lambda_unit_set') + (1 - `lambda_time_set') + (1 - `lambda_nn_set')
@@ -329,9 +331,9 @@ if `need_cv' > 0 {
     }
     local _nctrl = `N' - `n_treated'
     if "`cv_method'" == "resample" & "`group'" == "time" & `ntreated' > `_nctrl' {
-        di as error "cv(resample): ntreated (`ntreated') exceeds the number of never-treated units (`_nctrl')."
-        di as error "Resample CV draws ntreated control units per trial, so it cannot run on this design."
-        di as error "Use cv(kfold), set cv(resample, ntreated(#)) with # <= `_nctrl', or fix all three lambdas."
+        di as error "cv(resample): the design has `ntreated' treated units but only `_nctrl' never-treated units."
+        di as error "Resample CV stamps one placebo per treated unit, so it cannot run on this design."
+        di as error "Use cv(kfold) or fix all three lambdas."
         exit 459
     }
 
@@ -341,8 +343,6 @@ if `need_cv' > 0 {
     if "`_trials'" != "" & "`cv_method'" == "resample" & "`group'" != "time" ///
         di as txt "note: trials() ignored; cv(resample) is only used with group(time)."
 
-    if "`_ntreated'" != "" & !("`cv_method'" == "resample" & "`group'" == "time") ///
-        di as txt "note: ntreated() ignored (only used by cv(resample) with group(time))."
 
     if "`_folds'" != "" & "`cv_method'" != "kfold" ///
         di as txt "note: folds() ignored under cv(`cv_method')."
@@ -397,6 +397,44 @@ mata: trop_point_att(Y, W, "`group'", `lu', `lt', `lnn_arg')
 * Map point estimates back to raw outcome units
 local tau_hat = `tau_hat' * `Ysd'
 matrix __trop_ttau = `Ysd' * __trop_ttau
+
+*--- Label heterogeneous groups ---*
+local __trop_keys ""
+if "`group'" == "cell" {
+    forvalues g = 1/`n_targets' {
+        local __uv : word `=__trop_tinfo[`g',1]' of `__trop_uvals'
+        local __tv : word `=__trop_tinfo[`g',2]' of `__trop_tvals'
+        local __trop_keys "`__trop_keys' u`__uv'_t`__tv'"
+        matrix __trop_tinfo[`g',1] = `__uv'
+        matrix __trop_tinfo[`g',2] = `__tv'
+    }
+    matrix colnames __trop_tinfo = unit time
+    mata: trop_target_grid()
+}
+else {
+    forvalues g = 1/`n_targets' {
+        local __sv : word `=__trop_tinfo[`g',1]' of `__trop_tvals'
+        local __ev : word `=__trop_tinfo[`g',2]' of `__trop_tvals'
+        local __trop_keys "`__trop_keys' t`__sv'_`__ev'"
+        matrix __trop_tinfo[`g',1] = `__sv'
+        matrix __trop_tinfo[`g',2] = `__ev'
+        local __gu ""
+        forvalues k = 1/`=colsof(__trop_tunits)' {
+            if !missing(__trop_tunits[`g', `k']) {
+                local __uv : word `=__trop_tunits[`g',`k']' of `__trop_uvals'
+                local __gu "`__gu' `__uv'"
+            }
+        }
+        local __gu = strtrim("`__gu'")
+        if `g' == 1 local __trop_units "`__gu'"
+        else        local __trop_units "`__trop_units' | `__gu'"
+    }
+    matrix colnames __trop_tinfo = start end n_units n_cells
+    cap matrix drop __trop_tunits
+}
+cap matrix colnames __trop_ttau  = `__trop_keys'
+cap matrix colnames __trop_twt   = `__trop_keys'
+cap matrix rownames __trop_tinfo = `__trop_keys'
 *--------------------------------------------------------------------------*
 * (3) Standard error: bootstrap
 *--------------------------------------------------------------------------*
@@ -424,10 +462,13 @@ ereturn scalar tau = `tau_hat'
 ereturn scalar N = `N'
 ereturn scalar T = `T'
 ereturn scalar N_treated = `n_treated'
-ereturn scalar n_targets = `n_targets'
+ereturn scalar n_groups = `n_targets'
 ereturn local  group "`group'"
-ereturn matrix target_tau    = __trop_ttau
-ereturn matrix target_weight = __trop_twt
+ereturn matrix group_tau    = __trop_ttau
+ereturn matrix group_weight = __trop_twt
+ereturn matrix group_info   = __trop_tinfo
+if "`group'" == "time" ereturn local group_units "`__trop_units'"
+if "`group'" == "cell" ereturn matrix group_grid = __trop_tgrid
 ereturn scalar lambda_unit = `lu'
 ereturn scalar lambda_time = `lt'
 if "`lnn'" == "." ereturn scalar lambda_nn = .
@@ -481,6 +522,30 @@ if `need_cv' > 0 {
     di as text %12s " " " {c |}  " as text "(selected by `cv_method' CV)"
 }
 di as text "{hline 13}{c BT}{hline 50}"
+
+if `n_targets' > 1 {
+    if "`group'" == "cell" di as txt ///
+        `"(`n_targets' per-cell effects: {stata "matrix list e(group_grid), format(%9.4f)":e(group_grid)} [unit x time], e(group_tau), e(group_info))"'
+    else di as txt ///
+        "(`n_targets' per-spell effects in e(group_tau), e(group_weight), e(group_info), e(group_units))"
+}
+
+if "`detail'" != "" & `n_targets' > 1 & "`group'" == "time" {
+    di as txt ""
+    di as txt %12s "time periods" %7s "start" %6s "end" %7s "units" %7s "cells" %11s "tau" "   cohort's units"
+    tempname __ti __tt
+    matrix `__ti' = e(group_info)
+    matrix `__tt' = e(group_tau)
+    local __rest `"`e(group_units)'"'
+    forvalues g = 1/`n_targets' {
+        gettoken __gu __rest : __rest, parse("|")
+        if `"`__gu'"' == "|" gettoken __gu __rest : __rest, parse("|")
+        local __nm : word `g' of `: colnames `__tt''
+        di as txt %12s "`__nm'" as res %7.0g `__ti'[`g',1] %6.0g `__ti'[`g',2] ///
+           %7.0g `__ti'[`g',3] %7.0g `__ti'[`g',4] %11.4f `__tt'[1,`g'] ///
+           as txt "   `=strtrim(`"`__gu'"')'"
+    }
+}
 end
 
 *------------------------------------------------------------------------------*
@@ -515,6 +580,8 @@ cap mata: mata drop trop_loocv_cell_rmse_path()
 cap mata: mata drop trop_cv_single_cell()
 cap mata: mata drop trop_cv_loocv_cell()
 cap mata: mata drop trop_cv_joint_cell()
+cap mata: mata drop trop_target_grid()
+
 
 
 mata:
@@ -1318,9 +1385,10 @@ mata:
 void trop_point_att(real matrix Y, real matrix W, string scalar grp,
                     real scalar lu, real scalar lt, real scalar lnn)
 {
-    real scalar    G, att, pooled
-    real matrix    gid
-    real rowvector taus, wts
+    real scalar    G, att, pooled, g, k, maxU
+    real matrix    gid, info, mask, Umat
+    real rowvector taus, wts, per
+    real colvector us
 
     G = .
     gid    = trop_build_groups(W, grp, G)
@@ -1328,10 +1396,41 @@ void trop_point_att(real matrix Y, real matrix W, string scalar grp,
     taus = .; wts = .
     att = trop_att(Y, W, gid, G, lu, lt, lnn, pooled, 0, taus, wts)
 
+    if (grp == "cell") {
+        info = J(G, 2, .)
+        for (g = 1; g <= G; g++) {
+            mask = (gid :== g)
+            info[g,1] = selectindex(rowsum(mask) :> 0)   // unit row index
+            info[g,2] = selectindex(colsum(mask) :> 0)   // time index
+        }
+    }
+    else {
+        maxU = 0
+        for (g = 1; g <= G; g++) {
+            us = selectindex(rowsum(gid :== g) :> 0)
+            maxU = max((maxU, rows(us)))
+        }
+        info = J(G, 4, .)
+        Umat = J(G, maxU, .)
+        for (g = 1; g <= G; g++) {
+            mask = (gid :== g)
+            us  = selectindex(rowsum(mask) :> 0)
+            per = selectindex(colsum(mask) :> 0)
+            info[g,1] = per[1]                            // spell start index
+            info[g,2] = per[cols(per)]                    // spell end index
+            info[g,3] = rows(us)                          // units in spell
+            info[g,4] = sum(mask)                         // treated cells
+            for (k = 1; k <= rows(us); k++)               // member unit row
+                Umat[g, k] = us[k]                        //   indices, padded
+        }
+        st_matrix("__trop_tunits", Umat)                  // temp transfer only
+    }
+
     st_local("tau_hat",   strofreal(att, "%21.16g"))
     st_local("n_targets", strofreal(G))
     st_matrix("__trop_ttau", taus)
     st_matrix("__trop_twt",  wts)
+    st_matrix("__trop_tinfo", info)
 }
 end
 
@@ -1589,5 +1688,33 @@ void trop_cv_joint_cell(
         exit(498)
     }
     lambda_unit = best_u; lambda_time = best_t; lambda_nn = best_n
+}
+end
+
+mata:
+// Reshape per-cell taus into a U x P matrix with named stripes so that
+// -matrix list e(group_grid)- displays units x periods natively.
+void trop_target_grid()
+{
+    real matrix    info, TT
+    real rowvector taus
+    real colvector uvals, tvals
+    real scalar    G, U, P, g, ui, tj
+
+    info = st_matrix("__trop_tinfo")        // G x 2, actual unit/time values
+    taus = st_matrix("__trop_ttau")         // 1 x G, already rescaled
+    G = rows(info)
+    uvals = uniqrows(info[., 1])
+    tvals = uniqrows(info[., 2])
+    U = rows(uvals); P = rows(tvals)
+    TT = J(U, P, .)
+    for (g = 1; g <= G; g++) {
+        ui = selectindex(uvals :== info[g, 1])
+        tj = selectindex(tvals :== info[g, 2])
+        TT[ui, tj] = taus[g]
+    }
+    st_matrix("__trop_tgrid", TT)
+    st_matrixrowstripe("__trop_tgrid", (J(U, 1, ""), "u" :+ strofreal(uvals)))
+    st_matrixcolstripe("__trop_tgrid", (J(P, 1, ""), "t" :+ strofreal(tvals)))
 }
 end
