@@ -208,28 +208,7 @@ trop y unit time w_single, group(cell) cv(loocv, cells(200) seed(1))
              |  (selected by loocv CV)
 ----------------------------------------------------------------
 ```
-LOOCV appears to choose lambdas which result in a lower RMSE than resample. The values are higher which means it prioritises a short-term horizon. Let's verify that if we run `group(time)` using the LOOCV lambdas that our results will be the same.
-
-```s
-trop y unit time w_single, lambda_unit(2) lambda_time(4) lambda_nn(0.025)
-```
-which does correctly results in the same ATT:
-```
-----------------------------------------------------------------
-        TROP |  Triply Robust Panel estimator
--------------+--------------------------------------------------
-         ATT |     0.01512
-             |  (no inference; vce(noinference))
--------------+--------------------------------------------------
-     N units |         111
-   T periods |          48
-   N treated |           1
--------------+--------------------------------------------------
- lambda_unit |      2.0000
- lambda_time |      4.0000
-   lambda_nn |        .025
-----------------------------------------------------------------
-```
+LOOCV appears to choose lambdas which result in a lower RMSE than resample. The values are higher which means it prioritises a short-term horizon. 
  
 ### Block adoption
  
@@ -301,7 +280,7 @@ u101   0.0316   0.0408   0.0725   0.0636   0.0188  -0.2378  -0.2742  -0.2865  -0
 (output truncated)
 ```
  
-LOOCV under `group(cell)` performs poorly under block adoption relative to resample under group(time). Looking at the heterogenous treatment effects under `group(cell)`, we can see that units further from the onset of treatment have larger treatment effects. This is because LOOCV estimates placebo effects using control units which are surrounded by adjacent donor units. CV minimises the criterion on this basis, and chooses lambdas which are large (`lambda_unit=2` and `lambda_time=4`) which heavily weights nearby units. However, actual treated units in a block sit far from control units (i.e. up to 19 periods). Therefore, the lambdas chosen using LOOCV result in a much higher ATT than `cv(resample)`, because they give very little weight to the control units which sit far from treated units. 
+LOOCV under `group(cell)` performs poorly under block adoption relative to resample under group(time). Looking at the heterogenous treatment effects under `group(cell)`, we can see that units further from the onset of treatment have larger treatment effects. This is because LOOCV estimates placebo effects using control units which are surrounded by adjacent donor units. CV minimises the criterion on this basis, and chooses lambdas which are large (`lambda_unit=2` and `lambda_time=4`) which heavily weights nearby units. However, actual treated units in a block sit far from control units (i.e. up to 19 periods). Therefore, the lambdas chosen using LOOCV result in a much higher ATT than `cv(resample)`, because they give very little weight to the control units which sit far from treated units. Resample under `group(time)` performs far better, because the CV uses the actual treatment pattern on a subset of never-treated control units from the panel (and resamples this).
  
 ### Staggered adoption
  
@@ -346,19 +325,6 @@ e(group_tau)[1,3]
         t21_48      t31_48      t41_48
 r1  -.04527924   .05947124  -.04354185
 ```
- 
-```s
-matrix list e(group_info)
-```
- 
-```
-e(group_info)[3,4]
-          start      end  n_units  n_cells
-t21_48       21       48        5      140
-t31_48       31       48        5       90
-t41_48       41       48        5       40
-```
- 
 ### General assignment
  
 Under `w_gen`, treatment switches on and off at random such that units. Shared treated periods with the same (start, end) are still pooled across units, whereas single units are simply its own estimand. Here the treated units generate 51 distinct estimands:
