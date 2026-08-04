@@ -31,6 +31,8 @@ where $I_{j,s}^{i,t}$ is equal to 1 when $(j,s) = (i,t)$, and 0 otherwise. For a
 This formulation nests existing estimators as special cases, and these can be requested with arguments in `trop`:
 - **DID/TWFE**: $\lambda_{nn} = \infty$, uniform weights $\omega_j = \theta_s = 1$
 - **Matrix Completion (MC)**: uniform weights, $\lambda_{nn} < \infty$
+
+Future releases will include arguments to request:
 - **SC / SDID**: $\lambda_{nn} = \infty$, with SC- or SDID-specific unit and time weights
 
 ### Weights
@@ -281,7 +283,7 @@ u101   0.0316   0.0408   0.0725   0.0636   0.0188  -0.2378  -0.2742  -0.2865  -0
 (output truncated)
 ```
  
-LOOCV under `group(cell)` performs poorly under block adoption relative to resample under group(time). Looking at the heterogenous treatment effects under `group(cell)`, we can see that units further from the onset of treatment have larger treatment effects. This is because LOOCV estimates placebo effects using control units which are surrounded by adjacent donor units. CV minimises the criterion on this basis, and chooses lambdas which are large (`lambda_unit=2` and `lambda_time=4`) which heavily weights nearby units. However, actual treated units in a block sit far from control units (i.e. up to 19 periods). Therefore, the lambdas chosen using LOOCV result in a much higher ATT than `cv(resample)`. Resample under `group(time)` has a lower bias, because the CV uses the actual treatment pattern on a subset of never-treated control units from the panel.
+LOOCV under `group(cell)` performs poorly under block adoption relative to resample under group(time). Looking at the heterogenous treatment effects under `group(cell)`, we can see that units further from the onset of treatment have larger treatment effects. This is because LOOCV estimates placebo effects using control units which are surrounded by adjacent donor units. CV minimises the criterion on this basis, and chooses lambdas which are large (`lambda_unit=2` and `lambda_time=4`) which heavily weights nearby units. However, actual treated units in a block sit far from control units (i.e. up to 19 periods). Therefore, the lambdas chosen using LOOCV result in a much higher ATT than `cv(resample)`. Resample under `group(time)` has a lower bias, because the CV uses the actual treatment pattern on a subset of never-treated control units from the panel. As a result, we do not recommend using LOOCV under block adoption with many treated periods. 
  
 ### Staggered adoption
  
@@ -328,7 +330,7 @@ r1  -.04527924   .05947124  -.04354185
 ```
 ### General assignment
  
-Under general assignment, treatment switches on and off at random. Under `group(time)`, treated periods with the same start and end are pooled across units and single units simply remain their own estimand. Here the treated units generate 51 distinct estimands:
+Under general assignment, treatment can switch on and off. Under `group(time)`, treated periods with the same start and end are pooled across units and single units remain their own estimand. Here the treated units generate 51 individual estimands:
  
 ```s
 trop y unit time w_gen, lambda_unit(0.3) lambda_time(0.5) lambda_nn(0.025)
@@ -338,7 +340,7 @@ trop y unit time w_gen, lambda_unit(0.3) lambda_time(0.5) lambda_nn(0.025)
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
-         ATT |     0.00129
+         ATT |     0.00128
              |  (no inference; vce(noinference))
 -------------+--------------------------------------------------
      N units |         111
@@ -389,8 +391,8 @@ which returns
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
          ATT |     0.02963
-   Std. err. |     0.02196
-      95% CI |   -0.00748    0.06796
+   Std. err. |     0.02087
+      95% CI |   -0.01074    0.06781
 -------------+--------------------------------------------------
      N units |         111
    T periods |          48
