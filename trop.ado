@@ -1,10 +1,15 @@
 *! trop: Triply Robust Panel Estimators
-*! Version 0.2.5 July 6, 2026
+*! Version 0.2.6 August 4, 2026
 *! Author: Clarke Damian, Justin Waddy
 *! dclarke@fen.uchile.cl, j.waddy@exeter.ac.uk
 
 /*
 Versions
+0.2.6 August 4, 2026: Pooled (group(time)) fixed to correctly mask other treated units/current time period for unit distances.
+      Added pooled_treat_distance(time() unit()) option for group(time): allows you to set how distances to own treated group
+      are calculated. Default is empty, or ".", which uses the usual distances (i.e. from  midpoint for time weights or from
+      average of outcomes at each time period across the i units in a group for unit weights). Setting a number, such as zero, 
+      overrides the distances for treated units.
 0.2.5 July 6, 2026: Added 'detail' option which provides further details on heterogeneous treatment effects and the units in a given cohort.
 0.2.4 July 4, 2026: Resample and K-fold now use the pattern of treatment from treated units instead of entire block. Pooled time weights 
       now center on the block midpoint (min+max)/2, aligning with dist(s,t)=|t-s| (previously half-period late). Single treated 
@@ -37,6 +42,7 @@ syntax varlist(min=4 max=4) [if] [in],
     lambda_nn(string)
     cv(string)
     vce(string)
+    pooled_treat_distance(string)
     level(integer 95)
     verbose
     detail
@@ -129,6 +135,37 @@ if !inlist("`vce'", "bootstrap", "noinference") {
     exit 198
 }
 
+local ptd_unit_val "."
+local ptd_time_val "."
+if `"`pooled_treat_distance'"' != "" {
+    local _ptd_time ""
+    local _ptd_unit ""
+    foreach _k in time unit {
+        local _p = strpos(`"`pooled_treat_distance'"', "`_k'(")
+        if `_p' > 0 {
+            local _rest = substr(`"`pooled_treat_distance'"', `_p' + length("`_k'("), .)
+            local _q = strpos(`"`_rest'"', ")")
+            local _ptd_`_k' = trim(substr(`"`_rest'"', 1, `_q'-1))
+        }
+    }
+    foreach _k in time unit {
+        if "`_ptd_`_k''" != "" & "`_ptd_`_k''" != "." {
+            cap confirm number `_ptd_`_k''
+            if _rc {
+                di as error "pooled_treat_distance(): `_k'() must be a number or '.'."
+                exit 198
+            }
+        }
+    }
+    if "`group'" != "time" {
+        di as txt "note: pooled_treat_distance() ignored under group(cell)."
+    }
+    else {
+        if "`_ptd_unit'" != "" & "`_ptd_unit'" != "." local ptd_unit_val = `_ptd_unit'
+        if "`_ptd_time'" != "" & "`_ptd_time'" != "." local ptd_time_val = `_ptd_time'
+    }
+}
+
 tempvar touse
 mark `touse' `if' `in'
 
@@ -180,12 +217,12 @@ if r(N)!=0 {
     exit 450
 }
 qui sum `4'
-if (r(min)==0 & r(max)==0)==1 {
+if (r(min)==0 & r(max)==0) {
     di as error "All units are controls."
     exit 459
 }
 qui sum `4'
-if (r(min)==1 & r(max)==1)==1 {
+if (r(min)==1 & r(max)==1) {
     di as error "All units are treated."
     exit 459
 }
@@ -259,6 +296,10 @@ qui sort `2' `3'
 *Wide panels
 mata: Y = rowshape(st_data(., "`1'"), `N')
 mata: W = rowshape(st_data(., "`4'"), `N')
+
+*Pooled treated-block distance values
+mata: __trop_ptd_uval = `ptd_unit_val'
+mata: __trop_ptd_tval = `ptd_time_val'
 
 *--- Standardize outcome: (Y - overall mean) / overall SD, in place. ---*
 local Ysd = 1
@@ -435,6 +476,20 @@ else {
 cap matrix colnames __trop_ttau  = `__trop_keys'
 cap matrix colnames __trop_twt   = `__trop_keys'
 cap matrix rownames __trop_tinfo = `__trop_keys'
+
+if `n_zov' > 0 {
+    di as txt "warning: `n_zov' comparison unit-group pair(s) had no eligible periods to compute a"
+    di as txt "         unit distance from; those units received unit weight 0 in the affected group(s):"
+    forvalues k = 1/`n_zov' {
+        local __zg = __trop_zovinfo[`k',1]
+        local __zr = __trop_zovinfo[`k',2]
+        local __zk : word `__zg' of `__trop_keys'
+        local __zu : word `__zr' of `__trop_uvals'
+        di as txt "         unit `__zu' in group `__zk'"
+    }
+}
+cap matrix drop __trop_zovinfo
+
 *--------------------------------------------------------------------------*
 * (3) Standard error: bootstrap
 *--------------------------------------------------------------------------*
@@ -473,6 +528,12 @@ ereturn scalar lambda_unit = `lu'
 ereturn scalar lambda_time = `lt'
 if "`lnn'" == "." ereturn scalar lambda_nn = .
 else              ereturn scalar lambda_nn = `lnn'
+
+if "`group'" == "time" {
+    local _ptdu = cond("`ptd_unit_val'" == ".", "default", "`ptd_unit_val'")
+    local _ptdt = cond("`ptd_time_val'" == ".", "default", "`ptd_time_val'")
+    ereturn local pooled_treat_distance "unit(`_ptdu') time(`_ptdt')"
+}
 
 ereturn local cmd "trop"
 ereturn local depvar "`1'"
@@ -522,6 +583,10 @@ if `need_cv' > 0 {
     di as text %12s " " " {c |}  " as text "(selected by `cv_method' CV)"
 }
 di as text "{hline 13}{c BT}{hline 50}"
+
+if "`ptd_unit_val'" != "." | "`ptd_time_val'" != "." {
+    di as txt "(pooled treated-block distances: unit `=cond("`ptd_unit_val'"==".","default","`ptd_unit_val'")', time `=cond("`ptd_time_val'"==".","default","`ptd_time_val'")')"
+}
 
 if `n_targets' > 1 {
     if "`group'" == "cell" di as txt ///
@@ -1217,12 +1282,14 @@ real rowvector trop_time_weights2(real scalar T, real rowvector tp1,
 {
     real rowvector s0, tp0, d
     real scalar    c
+    external real scalar __trop_ptd_tval
     if (cols(tp1) == 0 | lt == 0) return(J(1, T, 1))
     s0  = (0..(T-1))
     tp0 = tp1 :- 1
     if (pooled) {
         c = (min(tp0) + max(tp0)) / 2
         d = abs(s0 :- c)
+        if (__trop_ptd_tval < .) d[tp1] = J(1, cols(tp1), __trop_ptd_tval)   // literal in-spell dist
     }
     else {
         d = abs(s0 :- tp0[1])
@@ -1237,30 +1304,39 @@ real colvector trop_unit_weights2(real matrix Y, real matrix W,
 {
     real scalar    N, T, i
     real rowvector avg, maskt, Wi
-    real colvector num, den, d
-    real matrix    M, diff2, sqdiff
+    real colvector den, d, ismem, zov
+    real matrix    M, sqdiff
+    external real scalar __trop_ptd_uval
+    external real colvector __trop_zov
 
     N = rows(Y); T = cols(Y)
+    __trop_zov = J(0, 1, .)
     if (lu == 0) return(J(N, 1, 1))
+    ismem = J(N, 1, 0)
+    ismem[tu1] = J(rows(tu1), 1, 1)
     if (pooled) {
-        avg    = mean(Y[tu1, .])                       // 1 x T mean target path
-        maskt  = J(1, T, 1)
-        maskt[1, tp1] = J(1, cols(tp1), 0)             // untreated = non-target periods
+        maskt  = (colsum(W[tu1, .]) :== 0)              // no group member treated at s
+        maskt[1, tp1] = J(1, cols(tp1), 0)              // never the target block itself
+        avg    = mean(Y[tu1, .])                        // 1 x T Ybar_G (masked cols unused)
         sqdiff = (J(N,1,1) * avg :- Y) :^ 2
-        num    = rowsum(sqdiff :* maskt)
-        d      = sqrt(num :/ sum(maskt))
+        if (__trop_ptd_uval < .) {                      // literal member diffs = x
+            sqdiff = sqdiff :* (1 :- ismem) :+ ismem :* (__trop_ptd_uval^2)
+        }
+        M = (J(N,1,1) * maskt) :* (1 :- W)              // and comparison unit j untreated
     }
     else {
-        i     = tu1[1]
-        Wi    = W[i, .]
+        i      = tu1[1]
+        Wi     = W[i, .]
         Wi[1, tp1] = J(1, cols(tp1), 1)                 // 1{u != t}: drop target period
-        M     = (J(N,1,1) * (1 :- Wi)) :* (1 :- W)      // commonly-untreated, u != t
-        diff2 = (J(N,1,1) * Y[i, .] :- Y) :^ 2
-        den   = rowsum(M)
-        den   = den :+ (den :== 0)                      // guard against /0
-        d     = sqrt(rowsum(M :* diff2) :/ den)
+        M      = (J(N,1,1) * (1 :- Wi)) :* (1 :- W)     // commonly-untreated, u != t
+        sqdiff = (J(N,1,1) * Y[i, .] :- Y) :^ 2
     }
-    return(exp(-lu :* d))
+    den = rowsum(M)
+    zov = (den :== 0) :* (1 :- ismem)                   // non-members with no eligible cells
+    __trop_zov = selectindex(zov)
+    den = den :+ (den :== 0)                            // members with no overlap: d = 0, weight 1
+    d   = sqrt(rowsum(M :* sqdiff) :/ den)
+    return( exp(-lu :* d) :* (1 :- zov) )               // no evidence -> weight 0
 }
 end
 
@@ -1361,10 +1437,12 @@ real scalar trop_att(real matrix Y, real matrix W, real matrix gid, real scalar 
     real scalar pooled, real scalar cv_mode,
     real rowvector taus_out, real rowvector wts_out)
 {
-    real scalar    N, T, g
+    real scalar    N, T, g, k
     real matrix    mask
     real colvector us
     real rowvector per, sizes
+    external real colvector __trop_zov
+    external real matrix    __trop_zov_all
 
     N = rows(Y); T = cols(Y)
     taus_out = J(1, G, .)
@@ -1375,6 +1453,10 @@ real scalar trop_att(real matrix Y, real matrix W, real matrix gid, real scalar 
         per  = selectindex(colsum(mask) :> 0)   // treated periods (rowvector)
         sizes[g]    = sum(mask)
         taus_out[g] = trop_target_tau(Y, W, mask, us, per, lu, lt, lnn, pooled, cv_mode)
+        if (cv_mode == 0) {                     // point estimation: record zero-overlap units
+            for (k = 1; k <= rows(__trop_zov); k++)
+                __trop_zov_all = __trop_zov_all \ (g, __trop_zov[k])
+        }
     }
     wts_out = sizes :/ sum(sizes)
     return( sum(wts_out :* taus_out) )
@@ -1389,11 +1471,13 @@ void trop_point_att(real matrix Y, real matrix W, string scalar grp,
     real matrix    gid, info, mask, Umat
     real rowvector taus, wts, per
     real colvector us
+    external real matrix __trop_zov_all
 
     G = .
     gid    = trop_build_groups(W, grp, G)
     pooled = (grp == "time")
     taus = .; wts = .
+    __trop_zov_all = J(0, 2, .)
     att = trop_att(Y, W, gid, G, lu, lt, lnn, pooled, 0, taus, wts)
 
     if (grp == "cell") {
@@ -1428,6 +1512,8 @@ void trop_point_att(real matrix Y, real matrix W, string scalar grp,
 
     st_local("tau_hat",   strofreal(att, "%21.16g"))
     st_local("n_targets", strofreal(G))
+    st_local("n_zov",     strofreal(rows(__trop_zov_all)))
+    st_matrix("__trop_zovinfo", __trop_zov_all)
     st_matrix("__trop_ttau", taus)
     st_matrix("__trop_twt",  wts)
     st_matrix("__trop_tinfo", info)
