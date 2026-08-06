@@ -404,6 +404,31 @@ which returns
 ----------------------------------------------------------------
 ```
 
+```s
+trop y unit time w, lambda_unit(0) lambda_time(1) lambda_nn(0.1) vce(jackknife)
+```
+
+```
+Jackknifing standard error: 111 replications, one unit deleted per replication.
+  100%  (111/111)   0:23 total
+
+----------------------------------------------------------------
+        TROP |  Triply Robust Panel estimator
+-------------+--------------------------------------------------
+         ATT |     0.02963
+   Std. err. |     0.02242
+      95% CI |   -0.01431    0.07357
+-------------+--------------------------------------------------
+     N units |         111
+   T periods |          48
+   N treated |          29
+-------------+--------------------------------------------------
+ lambda_unit |      0.0000
+ lambda_time |      1.0000
+   lambda_nn |          .1
+----------------------------------------------------------------
+```
+
 ## References
 Abadie, A., Diamond, A., & Hainmueller, J. (2010). [Synthetic control methods for comparative case studies: Estimating the effect of California's tobacco control program](https://doi.org/10.1198/jasa.2009.ap08746). *Journal of the American Statistical Association*, 105(490), 493–505.
 
