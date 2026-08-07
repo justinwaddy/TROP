@@ -488,6 +488,18 @@ Jackknife inference using 111 leave-one-out replications.
 ----------------------------------------------------------------
 ```
 
+## Computational time
+The examples in this readme were run on a laptop with the following computational setup:
+1.	Operating System:    Windows 11 Enterprise (Version 10.0.22621 Build 22621)
+2.	CPU:   13th Gen Intel(R) Core(TM) i7-1355U, 1700 Mhz, 10 Core(s), 12 Logical Processor(s)
+3.	RAM:   32 GB
+4.	Software version: Stata/SE 18.0 for Windows (64-bit x86-64)
+
+In general, we advise:
+1. Testing your data using TROP with set lambdas for fast computations to begin with.
+2. Running CV on the main specification (resample best suited for designs with long, uninterrupted treatment periods).
+3. Running block bootstrap and jackknife inference using the lambdas from your CV step.
+
 ## References
 Abadie, A., Diamond, A., & Hainmueller, J. (2010). [Synthetic control methods for comparative case studies: Estimating the effect of California's tobacco control program](https://doi.org/10.1198/jasa.2009.ap08746). *Journal of the American Statistical Association*, 105(490), 493–505.
 
