@@ -5,7 +5,7 @@
 
 /*
 Versions
-0.2.7 August 6, 2026: Added adaptive CV, vce(jackknife) and progress bars. Verbose shows ASCII visual of adaptive CV.
+0.2.7 August 7, 2026: Added adaptive CV, vce(jackknife) and progress bars. Verbose shows ASCII visual of adaptive CV.
 0.2.6 August 4, 2026: Pooled (group(time)) fixed to correctly mask other treated units/current time period for unit distances.
       Added pooled_treat_distance(time() unit()) option for group(time): allows you to set how distances to own treated group
       are calculated. Default is empty, or ".", which uses the usual distances (i.e. from  midpoint for time weights or from
