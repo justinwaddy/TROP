@@ -508,7 +508,7 @@ The examples in this readme were run on the following computational setup:
 In general, we advise:
 1. Testing your data using TROP with set lambdas for fast computations to begin with.
 2. Running CV on the main specification (resample best suited for designs with long, uninterrupted treatment periods).
-3. Running block bootstrap and jackknife inference using the lambdas from your CV step.
+3. Running block bootstrap and jackknife inference using the lambdas from cross-validation.
 
 ## References
 Abadie, A., Diamond, A., & Hainmueller, J. (2010). [Synthetic control methods for comparative case studies: Estimating the effect of California's tobacco control program](https://doi.org/10.1198/jasa.2009.ap08746). *Journal of the American Statistical Association*, 105(490), 493–505.
