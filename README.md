@@ -295,7 +295,13 @@ trop y unit time w_block, group(cell) cv(loocv, cells(200) seed(1))
  
 ```
 Cross-validating lambdas using loocv with cycle search, and 200 samples of 5058 total control cells.
-16:28 total
+To reduce loocv computational time, reduce number of cells or set lambdas.
+  marginal:  lambda_time -> 4   lambda_unit -> 2   lambda_nn -> .25   1:37 elapsed
+  cycle 1 of up to 50:  lambda_unit -> 2   lambda_time -> 4   lambda_nn -> .025   5:33 elapsed
+  cycle 2 of up to 50:  lambda_unit -> 2   lambda_time -> 4   lambda_nn -> .025   16:28 elapsed
+  converged after 2 cycle(s), 16:28 total
+Computing 270 group effects.
+  100%  (270/270)   0:04 elapsed
 
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
@@ -312,6 +318,7 @@ Cross-validating lambdas using loocv with cycle search, and 200 samples of 5058 
    lambda_nn |        .025
              |  (selected by loocv CV)
 ----------------------------------------------------------------
+(270 per-cell effects: e(group_grid) [unit x time], e(group_tau), e(group_info))
 ```
  
 The treatment effect are a lot higher using the parameters chosen by LOOCV. We'll study heterogenous treatment effects more closely by using `e(group_grid)`:
