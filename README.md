@@ -163,15 +163,45 @@ set seed 42
 gen w_gen = (unit >= 102) & (runiform() < 0.2) //We choose the same treated units as before, and given treated-unit cell has a 20% chance of being assigned treatment status.
 ```
 
-### Single treated period
+### Single treated period and unit
  
-First, we estimate the effects for one treated unit treated in final period. Grouping by cell and time will be equivalent here under the same lambdas, given that no estimands can be grouped with one treated unit at a specific time. Let's see how the cross-validation results compare:
- 
+First, we estimate the effects for one treated unit treated in the final period. Grouping by cell and time will be equivalent here under the same lambdas. Firstly, we'll test out the command using choice lambdas (which computes almost instantly):
+
+```s
+trop y unit time w_single, lambda_unit(0.3) lambda_time(0.325) lambda_nn(0.1)
+```
+
+```
+----------------------------------------------------------------
+        TROP |  Triply Robust Panel estimator
+-------------+--------------------------------------------------
+         ATT |     0.02629
+             |  (no inference; vce(noinference))
+-------------+--------------------------------------------------
+     N units |         111
+   T periods |          48
+   N treated |           1
+-------------+--------------------------------------------------
+ lambda_unit |      0.3000
+ lambda_time |      0.3250
+   lambda_nn |          .1
+----------------------------------------------------------------
+```
+
+The ATT here is close to zero, but we'd prefer to use a cross-validation method to select these parameters. Let's see how the cross-validation results compare, beginning with using a resampling CV method:
+
 ```s
 trop y unit time w_single, cv(resample, seed(1))
 ```
  
 ```
+Cross-validating lambdas using resample with cycle search, and 200 trials (seed 1).
+To reduce resample computational time, reduce no of trials or set lambdas.
+  cycle 1 of up to 50:  lambda_unit -> .2   lambda_time -> 2   lambda_nn -> .05   4:26 elapsed
+  cycle 2 of up to 50:  lambda_unit -> .8   lambda_time -> 2   lambda_nn -> .05   12:11 elapsed
+  cycle 3 of up to 50:  lambda_unit -> .8   lambda_time -> 2   lambda_nn -> .05   21:11 elapsed
+  converged after 3 cycle(s), 21:11 total
+
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
@@ -189,12 +219,19 @@ trop y unit time w_single, cv(resample, seed(1))
 ----------------------------------------------------------------
 ```
  
-Under `group(cell)`:
+Cross-validation in general is intensive, and takes about 20 minutes. The ATT is lower than under the lambdas we provided. Let's see how it compares to using LOOCV under `group(cell)`:
 ```s
 trop y unit time w_single, group(cell) cv(loocv, cells(200) seed(1))
 ```
  
 ```
+Cross-validating lambdas using loocv with cycle search, and 200 samples of 5327 total control cells.
+To reduce loocv computational time, reduce number of cells or set lambdas.
+  marginal:  lambda_time -> 4   lambda_unit -> 2   lambda_nn -> .25   1:10 elapsed
+  cycle 1 of up to 50:  lambda_unit -> 2   lambda_time -> 4   lambda_nn -> .025   4:48 elapsed
+  cycle 2 of up to 50:  lambda_unit -> 2   lambda_time -> 4   lambda_nn -> .025   14:46 elapsed
+  converged after 2 cycle(s), 14:46 total
+
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
@@ -211,12 +248,13 @@ trop y unit time w_single, group(cell) cv(loocv, cells(200) seed(1))
              |  (selected by loocv CV)
 ----------------------------------------------------------------
 ```
-LOOCV appears to choose lambdas which result in a lower RMSE than resample.
+
+LOOCV appears to choose lambdas which result in a lower RMSE than resample, and has a slightly shorter computational time.
  
 ### Block adoption
  
-Under block adoption, units are treated simultaneously in the final 18 periods. Under `group(time)` this is one pooled spell of 270 cells (15 units × 18 periods):
- 
+Under block adoption, units are treated simultaneously in the final 18 periods. Under `group(time)`, which is the default, this is one pooled spell of 270 cells (15 units × 18 periods):
+
 ```s
 trop y unit time w_block, cv(resample, seed(1))
 ```
@@ -224,6 +262,12 @@ trop y unit time w_block, cv(resample, seed(1))
 which returns 
 
 ```
+Cross-validating lambdas using resample with cycle search, and 200 trials (seed 1).
+To reduce resample computational time, reduce no of trials or set lambdas.
+  cycle 1 of up to 50:  lambda_unit -> 0   lambda_time -> 0   lambda_nn -> .1   5:58 elapsed
+  cycle 2 of up to 50:  lambda_unit -> 0   lambda_time -> 0   lambda_nn -> .1   18:58 elapsed
+  converged after 2 cycle(s), 18:58 total
+
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
@@ -248,6 +292,9 @@ trop y unit time w_block, group(cell) cv(loocv, cells(200) seed(1))
 ```
  
 ```
+Cross-validating lambdas using loocv with cycle search, and 200 samples of 5058 total control cells.
+16:28 total
+
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
@@ -263,10 +310,9 @@ trop y unit time w_block, group(cell) cv(loocv, cells(200) seed(1))
    lambda_nn |        .025
              |  (selected by loocv CV)
 ----------------------------------------------------------------
-(270 per-cell effects: e(group_grid) [unit x time], e(group_tau), e(group_info))
 ```
  
-This null effect appears to be very high. To study the heterogenous treatment effects more closely, use `e(group_grid)`:
+The treatment effect are a lot higher using the parameters chosen by LOOCV. We'll study heterogenous treatment effects more closely by using `e(group_grid)`:
  
 ```s
 matrix list e(group_grid), format(%9.4f)
@@ -283,7 +329,7 @@ u101   0.0316   0.0408   0.0725   0.0636   0.0188  -0.2378  -0.2742  -0.2865  -0
 (output truncated)
 ```
  
-LOOCV under `group(cell)` performs poorly under block adoption relative to resample under group(time). Looking at the heterogenous treatment effects under `group(cell)`, we can see that units further from the onset of treatment have larger treatment effects. This is because LOOCV estimates placebo effects using control units which are surrounded by adjacent donor units. CV minimises the criterion on this basis, and chooses lambdas which are large (`lambda_unit=2` and `lambda_time=4`) which heavily weights nearby units. However, actual treated units in a block sit far from control units (i.e. up to 19 periods). Therefore, the lambdas chosen using LOOCV result in a much higher ATT than `cv(resample)`. Resample under `group(time)` has a lower bias, because the CV uses the actual treatment pattern on a subset of never-treated control units from the panel. As a result, we do not recommend using LOOCV under block adoption with many treated periods. 
+Under block adoption, LOOCV with `group(cell)` performs poorly relative to resample with `group(time)`. The heterogenous treatment effects above shows that units further from the onset of treatment have larger treatment effects. This is because LOOCV estimates placebo effects using control units which are surrounded by adjacent donor units. CV minimises the criterion under this design, and chooses lambdas which are large (`lambda_time=4`). This heavily weights nearby units. However, treated units in block actually sit far from control units (i.e. up to 19 periods). Resample CV under `group(time)` suits block adoption, because the CV uses the actual treatment pattern on a subset of never-treated control units from the panel. As a result, we recommend using resample under block adoption with many treated periods. 
  
 ### Staggered adoption
  
@@ -294,6 +340,12 @@ trop y unit time w_stag, cv(resample, seed(1)) detail
 ```
  
 ```
+Cross-validating lambdas using resample with cycle search, and 200 trials (seed 1).
+To reduce resample computational time, reduce no of trials or set lambdas.
+  cycle 1 of up to 50:  lambda_unit -> 0   lambda_time -> 0   lambda_nn -> .005   21:37 elapsed
+  cycle 2 of up to 50:  lambda_unit -> 0   lambda_time -> 0   lambda_nn -> .005   2:42:31 elapsed
+  converged after 2 cycle(s), 2:42:31 total
+
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
@@ -310,14 +362,14 @@ trop y unit time w_stag, cv(resample, seed(1)) detail
              |  (selected by resample CV)
 ----------------------------------------------------------------
 (3 per-spell effects in e(group_tau), e(group_weight), e(group_info), e(group_units))
- 
+
 time periods  start   end  units  cells        tau   cohort's units
       t21_48     21    48      5    140    -0.0453   97 98 99 100 101
       t31_48     31    48      5     90     0.0595   102 103 104 105 106
       t41_48     41    48      5     40    -0.0435   107 108 109 110 111
 ```
  
-The per-cohort effects are also returned in `e(group_tau)` if you have not used the detail option (but the cohort's units are not):
+The per-cohort effects are also returned in `e(group_tau)` if you have not used the detail option (but the indexed cohort units are not):
  
 ```s
 matrix list e(group_tau)
@@ -337,6 +389,9 @@ trop y unit time w_gen, lambda_unit(0.3) lambda_time(0.5) lambda_nn(0.025)
 ```
  
 ```
+Computing 51 group effects.
+  100%  (51/51)   0:22 elapsed
+
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
@@ -387,6 +442,10 @@ trop y unit time w, lambda_unit(0) lambda_time(1) lambda_nn(0.1) vce(bootstrap)
 which returns
 
 ```
+To reduce computational time, reduce reps() or use vce(jackknife).
+Bootstrap inference using 200 bootstrap replications.
+  100%  (200/200)   0:13 elapsed
+
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
@@ -409,8 +468,8 @@ trop y unit time w, lambda_unit(0) lambda_time(1) lambda_nn(0.1) vce(jackknife)
 ```
 
 ```
-Jackknifing standard error: 111 replications, one unit deleted per replication.
-  100%  (111/111)   0:23 total
+Jackknife inference using 111 leave-one-out replications.
+  100%  (111/111)   0:09 elapsed
 
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
