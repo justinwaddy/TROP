@@ -95,7 +95,7 @@ trop Y S T D [if] [in] [, group(type) lambda_unit(#) lambda_time(#) lambda_nn(#)
     - nn_grid(string): candidate $\lambda_{nn}$ values; may include **.** for the no-$\mathbf{L}$ (TWFE) case. Default `0.005 0.01 0.025 0.05 0.1 0.25 0.5 1 .`.
 
   E.g. `cv(loocv joint)`, `cv(resample, trials(500))`, `cv(kfold, folds(10))`, `cv(resample adaptive, points(12) time_grid(0 4))`, `cv(loocv, nn_grid(0.01 0.1 1 .) unit_grid(0 0.5 1))`.
-+ vce(vcetype [, reps(#) seed(#)]): **noinference** (default) to skip inference; **bootstrap** for stratified block-bootstrap standard errors and a percentile confidence interval; **jackknife** for delete-one-unit standard errors. reps() sets bootstrap repetitions (default 200) and seed() sets the bootstrap seed).
++ vce(vcetype [, reps(#) seed(#)]): **noinference** (default) to skip inference; **bootstrap** for stratified block-bootstrap standard errors and a percentile confidence interval; **jackknife** for delete-one-unit standard errors. reps() sets bootstrap repetitions (default 200) and seed() sets the bootstrap seed.
 + level(): confidence level for the reported interval (default 95).
 + verbose: under `cv(..., adaptive)`, print an RMSE heat map of the searched grid after each phase, and print the selected lambdas at the end of cross-validation.
 + detail: display which units are grouped into each cohort under `group(time)`.
