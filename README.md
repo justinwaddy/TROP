@@ -73,30 +73,32 @@ The panel must be balanced, with no missing values in Y or D. Treatment may foll
 ```s
 trop Y S T D [if] [in] [, group(type) lambda_unit(#) lambda_time(#) lambda_nn(#)
                           cv(method [search] [, suboptions])
-                          vce(vcetype [, reps(#) seed(#)]) level(#) verbose ]
+                          vce(vcetype [, reps(#) seed(#)])
+                          level(#) verbose detail ]
 ```
-+ group(): **time** (default) or **cell**. Determines how treated unit-time cells are grouped into estimands. **time** (default) groups estimands across adjacent treated periods for a given unit into blocks, and further groups these blocks across units which share the same treatment timing. For example, simultaneous adoption which switches on permanently results in one estimand for $\tau$, and staggered adoption results in as many treatment effects as there are adoption cohorts as usual. **cell** treats every unit-time cell as its own target and reports the ATT by aggregating per-cell effects (paper Eq. 1).  
++ group(): **time** (default) or **cell**. Determines how treated unit-time cells are grouped into estimands. **time** (default) groups estimands across adjacent treated periods for a given unit into blocks, and further groups these blocks across units which share the same treatment timing. For example, simultaneous adoption which switches on permanently results in one estimand for $\tau$, and staggered adoption results in as many treatment effects as there are adoption cohorts as usual. **cell** treats every unit-time cell as its own target and reports the ATT by aggregating per-cell effects (paper Eq. 1).
 + lambda_unit(): tuning parameter for unit weights $\omega_j$. Larger values concentrate weight on control units whose pre-treatment paths most resemble the treated unit; 0 weights all units equally. If omitted, chosen by cross-validation.
 + lambda_time(): tuning parameter for time weights $\theta_s$. Larger values concentrate weight on periods near treatment; 0 weights all periods equally. If omitted, chosen by cross-validation.
 + lambda_nn(): tuning parameter for the nuclear-norm penalty on the low-rank component $\mathbf{L}$. Larger values shrink $\mathbf{L}$ toward low rank; **inf** (or **.**) drops $\mathbf{L}$, reducing TROP to weighted two-way fixed effects. If omitted, chosen by cross-validation.
 + cv(method [search] [, suboptions]): cross-validation scheme used to choose any lambda left unspecified. The first word is the method, the optional second word is the search type, and tuning knobs follow a comma.
-  - *method*: **loocv** leave-one-out (default under `group(cell)`); **resample** random placebo-treated sets drawn from the control panel (default under `group(time)`); **kfold** controls partitioned into folds, each treated once. **resample** and **kfold** require `group(time)`, **loocv** requires `group(cell)`. 
-  - *search*: **cycle** (default) coordinate descent; **joint** full grid search.
+  - *method*: **loocv** leave-one-out (default under `group(cell)`); **resample** random placebo-treated sets drawn from the control panel (default under `group(time)`); **kfold** controls partitioned into folds, each treated once. **resample** and **kfold** require `group(time)`, **loocv** requires `group(cell)`.
+  - *search*: **cycle** (default) coordinate descent, optimising one lambda at a time over its grid with the other two held at their current values, repeating until the triplet stops changing (at most 50 cycles); **joint** an exhaustive grid search over every combination; **adaptive** evaluates an evenly spaced grid across a range, widens the range whenever the best lambda lands on its edge, then zooms in around the best point and searches again. Uses the smallest and largest values of any grid you supply as its starting range ([0;1] default grid).
   - *suboptions*:
     - trials(#): placebo draws under **resample** (default 200; ignored otherwise).
-    - ntreated(#): placebo-treated units per **resample** draw (defaults to number of treated units in panel).
     - folds(#): number of folds under **kfold** (default 5; ignored otherwise).
     - cells(#): number of randomly sampled control cells scored under **loocv** (default all control cells; ignored otherwise). Useful for large panels where full LOOCV is slow.
-    - seed(#): seed under resample and kfold draws (default 0). Under LOOCV it has an effect only with cells(#) option. LOOCV with all control cells is deterministic.
+    - seed(#): seed for the resample and kfold draws (default 0). Under LOOCV it has an effect only with the cells(#) option. LOOCV with all control cells is deterministic.
+    - points(#): grid points per lambda under **adaptive** (default 10).
+    - expansions(#): how many times **adaptive** may widen a range whose best lambda sits on edge of grid (default 6).
     - unit_grid(numlist): candidate $\lambda_\text{unit}$ values. Default `0 0.1 0.2 0.3 0.5 0.8 1.2 1.6 2`.
     - time_grid(numlist): candidate $\lambda_\text{time}$ values. Default `0 0.025 0.05 0.1 0.2 0.35 0.5 0.75 1 2 4`.
     - nn_grid(string): candidate $\lambda_{nn}$ values; may include **.** for the no-$\mathbf{L}$ (TWFE) case. Default `0.005 0.01 0.025 0.05 0.1 0.25 0.5 1 .`.
 
-  E.g. `cv(loocv joint)`, `cv(resample, trials(500) ntreated(10))`, `cv(kfold, folds(10))`, `cv(loocv, nn_grid(0.01 0.1 1 .) unit_grid(0 0.5 1))`.
-+ vce(vcetype [, reps(#) seed(#)]): **noinference** (default) to skip inference, or **bootstrap** for stratified block-bootstrap standard errors and a percentile confidence interval. reps() sets bootstrap repetitions (default 200); seed() sets the bootstrap seed.
+  E.g. `cv(loocv joint)`, `cv(resample, trials(500))`, `cv(kfold, folds(10))`, `cv(resample adaptive, points(12) time_grid(0 4))`, `cv(loocv, nn_grid(0.01 0.1 1 .) unit_grid(0 0.5 1))`.
++ vce(vcetype [, reps(#) seed(#)]): **noinference** (default) to skip inference; **bootstrap** for stratified block-bootstrap standard errors and a percentile confidence interval; **jackknife** for delete-one-unit standard errors. reps() sets bootstrap repetitions (default 200) and seed() sets the bootstrap seed).
 + level(): confidence level for the reported interval (default 95).
-+ verbose: display cross-validation and bootstrap progress.
-+ detail: display which units are grouped into each cohort under group(time). 
++ verbose: under `cv(..., adaptive)`, print an RMSE heat map of the searched grid after each phase, and print the selected lambdas at the end of cross-validation.
++ detail: display which units are grouped into each cohort under `group(time)`.
 
 ## Grouping Estimands: Per-cell vs Time
 
