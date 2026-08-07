@@ -462,6 +462,7 @@ Bootstrap inference using 200 bootstrap replications.
    lambda_nn |          .1
 ----------------------------------------------------------------
 ```
+Next, we also provide an option for jackknife inference which also shows a null effect.
 
 ```s
 trop y unit time w, lambda_unit(0) lambda_time(1) lambda_nn(0.1) vce(jackknife)
@@ -489,7 +490,7 @@ Jackknife inference using 111 leave-one-out replications.
 ```
 
 ## Computational time
-The examples in this readme were run on a laptop with the following computational setup:
+The examples in this readme were run on the following computational setup:
 1.	Operating System:    Windows 11 Enterprise (Version 10.0.22621 Build 22621)
 2.	CPU:   13th Gen Intel(R) Core(TM) i7-1355U, 1700 Mhz, 10 Core(s), 12 Logical Processor(s)
 3.	RAM:   32 GB
