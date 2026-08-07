@@ -498,7 +498,7 @@ Jackknife inference using 111 leave-one-out replications.
 ----------------------------------------------------------------
 ```
 
-## Computation
+## Computational costs
 The examples in this readme were run on the following computational setup:
 1.	Operating System:    Windows 11 Enterprise (Version 10.0.22621 Build 22621)
 2.	CPU:   13th Gen Intel(R) Core(TM) i7-1355U, 1700 Mhz, 10 Core(s), 12 Logical Processor(s)
