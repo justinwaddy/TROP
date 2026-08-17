@@ -1,10 +1,12 @@
 *! trop: Triply Robust Panel Estimators
-*! Version 0.2.7 August 7, 2026
+*! Version 0.2.8 August 17, 2026
 *! Author: Clarke Damian, Justin Waddy
 *! dclarke@fen.uchile.cl, j.waddy@exeter.ac.uk
 
 /*
 Versions
+0.2.8 August 13, 2026: Adaptive CV now begins with a sweep of the full lambda grids (the defaults are the same
+      grids used by cycle and joint). Verbose heatmap now has a Legend, which maps each symbol to its RMSE range.
 0.2.7 August 7, 2026: Added adaptive CV, vce(jackknife) and progress bars. Verbose shows ASCII visual of adaptive CV.
 0.2.6 August 4, 2026: Pooled (group(time)) fixed to correctly mask other treated units/current time period for unit distances.
       Added pooled_treat_distance(time() unit()) option for group(time): allows you to set how distances to own treated group
@@ -364,10 +366,8 @@ local default_unit_grid "0 0.1 0.2 0.3 0.5 0.8 1.2 1.6 2"
 local default_time_grid "0 0.025 0.05 0.1 0.2 0.35 0.5 0.75 1 2 4"
 local default_nn_grid   "0.005 0.01 0.025 0.05 0.1 0.25 0.5 1 ."
 
-* Adaptive search derives init ranges from user grids when supplied, else [0,1].
-local unit_grid_user = (`"`unit_grid'"' != "")
-local time_grid_user = (`"`time_grid'"' != "")
-local nn_grid_user   = (`"`nn_grid'"'   != "")
+* Adaptive search sweeps the grids below literally in phase 1 (so its
+* defaults are the joint/cycle grids), then brackets and refines.
 
 if "`unit_grid'" == "" local unit_grid "`default_unit_grid'"
 if "`time_grid'" == "" local time_grid "`default_time_grid'"
@@ -709,6 +709,9 @@ cap mata: mata drop trop_ad_rangeline()
 cap mata: mata drop trop_ad_heat()
 cap mata: mata drop trop_ad_axlist()
 cap mata: mata drop trop_ad_num()
+cap mata: mata drop trop_ad_gridline()
+cap mata: mata drop trop_ad_bracket()
+cap mata: mata drop trop_ad_pad()
 
 
 
@@ -1241,7 +1244,7 @@ void trop_cv_setup(real matrix Yfull, real matrix Wfull)
     real scalar tune_unit, tune_time, tune_nn
     real scalar lambda_unit, lambda_time, lambda_nn, cycles_used
     real scalar ntrials, ntreated, best_rmse, n_eval
-    real scalar lo_u, hi_u, lo_t, hi_t, lo_n, hi_n, nn_inf_only, npts_a, nexp_a, phases_a
+    real scalar nn_inf_only, npts_a, nexp_a, phases_a
     real rowvector fin_r, res_a
     string scalar method, search
     pointer(real colvector) rowvector sets
@@ -1282,34 +1285,12 @@ void trop_cv_setup(real matrix Yfull, real matrix Wfull)
 
     cycles_used = .
 
-    // Adaptive search: init ranges from user-supplied grid min/max (or the
-    // fixed-collapsed single values), else the upstream default [0,1].
+    // Adaptive search: phase 1 sweeps the grids above literally (the defaults
+    // are the joint/cycle grids); later phases bracket the winner between its
+    // neighbouring grid points and refine on uniform points() grids.
     if (search == "adaptive") {
-        fin_r = select(unit_grid, unit_grid :< .)
-        if (tune_unit & !strtoreal(st_local("unit_grid_user"))) {
-            lo_u = 0; hi_u = 1
-        }
-        else {
-            lo_u = min(fin_r); hi_u = max(fin_r)
-        }
-        fin_r = select(time_grid, time_grid :< .)
-        if (tune_time & !strtoreal(st_local("time_grid_user"))) {
-            lo_t = 0; hi_t = 1
-        }
-        else {
-            lo_t = min(fin_r); hi_t = max(fin_r)
-        }
         fin_r = select(nn_grid, nn_grid :< .)
         nn_inf_only = (cols(fin_r) == 0)        // fixed at inf (or all-. grid)
-        if (nn_inf_only) {
-            lo_n = .; hi_n = .
-        }
-        else if (tune_nn & !strtoreal(st_local("nn_grid_user"))) {
-            lo_n = 0; hi_n = 1
-        }
-        else {
-            lo_n = min(fin_r); hi_n = max(fin_r)
-        }
         npts_a = strtoreal(st_local("npoints"))
         nexp_a = strtoreal(st_local("nexpansions"))
     }
@@ -1319,9 +1300,9 @@ void trop_cv_setup(real matrix Yfull, real matrix Wfull)
     if (search == "adaptive") {
             phases_a = .
             res_a = trop_cv_adaptive(Yfull, Wfull, J(1, 0, NULL), cells, 1,
-                                     lo_u, hi_u, tune_unit,
-                                     lo_t, hi_t, tune_time,
-                                     lo_n, hi_n, tune_nn, nn_inf_only,
+                                     unit_grid, tune_unit,
+                                     time_grid, tune_time,
+                                     nn_grid, tune_nn, nn_inf_only,
                                      npts_a, nexp_a, tol, max_iter,
                                      (st_local("verbose") != ""), phases_a)
             lambda_unit = res_a[1]; lambda_time = res_a[2]; lambda_nn = res_a[3]
@@ -1354,9 +1335,9 @@ void trop_cv_setup(real matrix Yfull, real matrix Wfull)
         if (search == "adaptive") {
             phases_a = .
             res_a = trop_cv_adaptive(Yc, J(0, 0, .), sets, J(0, 2, .), 0,
-                                     lo_u, hi_u, tune_unit,
-                                     lo_t, hi_t, tune_time,
-                                     lo_n, hi_n, tune_nn, nn_inf_only,
+                                     unit_grid, tune_unit,
+                                     time_grid, tune_time,
+                                     nn_grid, tune_nn, nn_inf_only,
                                      npts_a, nexp_a, tol, max_iter,
                                      (st_local("verbose") != ""), phases_a)
             lambda_unit = res_a[1]; lambda_time = res_a[2]; lambda_nn = res_a[3]
@@ -2126,7 +2107,6 @@ string scalar trop_ad_num(real scalar x)
 end
 
 mata:
-// One-line ASCII range diagram for lambda axis
 void trop_ad_rangeline(string scalar name,
     real scalar flo, real scalar fhi,
     real scalar alo, real scalar ahi,
@@ -2145,6 +2125,13 @@ void trop_ad_rangeline(string scalar name,
     v = J(1, W, "-")
     pa = 1 + round((alo - flo) / (fhi - flo) * (W - 1))
     pb = 1 + round((ahi - flo) / (fhi - flo) * (W - 1))
+    if (pa < 1)     pa = 1
+    if (pa > W - 1) pa = W - 1
+    if (pb <= pa)   pb = pa + 1
+    if (pb > W) {
+        pb = W
+        if (pa >= pb) pa = pb - 1
+    }
     for (k = pa; k <= pb; k++) v[k] = "="
     v[pa] = "["
     v[pb] = "]"
@@ -2154,13 +2141,25 @@ void trop_ad_rangeline(string scalar name,
     }
     if (best < .) {
         pz = 1 + round((best - flo) / (fhi - flo) * (W - 1))
-        if (pz >= 1 & pz <= W) v[pz] = "*"
+        if (pz < pa + 1) pz = pa + 1
+        if (pz > pb - 1) pz = pb - 1
+        if (pz > pa & pz < pb) v[pz] = "*"
     }
     line = ""
     for (k = 1; k <= W; k++) line = line + v[k]
     printf("{txt}    %-12s %s %s %s%s\n",
            name, trop_ad_num(flo), line, trop_ad_num(fhi), extra)
     displayflush()
+}
+end
+
+mata:
+string scalar trop_ad_pad(string scalar s, real scalar w)
+{
+    string scalar out
+    out = s
+    while (strlen(out) < w) out = out + " "
+    return(out)
 }
 end
 
@@ -2187,17 +2186,16 @@ string scalar trop_ad_axlist(real scalar bd_u, real scalar bd_t, real scalar bd_
 end
 
 mata:
-// ASCII heatmap of the evaluated (unit x time) grid, printed under verbose
-// after each adaptive phase.
 void trop_ad_heat(transmorphic A,
     real rowvector axis_u, real rowvector axis_t, real rowvector axis_n,
     real scalar bu, real scalar bt,
     real scalar rescale, real scalar gmin, real scalar gmax)
 {
     real scalar nu, nt, ng, i, j, g, s, v, lo, hi, idx, bi, bj
-    real scalar k, c, pos, prev, col
+    real scalar k, c, pos, prev, col, LW, li, nl, dw, bw, slot, start
     real matrix Sm
-    string scalar ramp, line, lab, ch, ticks
+    string scalar ramp, line, lab, ch, ticks, left
+    string rowvector leg, sym, des
 
     ramp = "#+-."                     // low RMSE -> "#" ... high RMSE -> "."
     nu = cols(axis_u); nt = cols(axis_t); ng = cols(axis_n)
@@ -2225,13 +2223,51 @@ void trop_ad_heat(transmorphic A,
     for (i = 1; i <= nu; i++) if (reldif(axis_u[i], bu) < 1e-9) bi = i
     for (j = 1; j <= nt; j++) if (reldif(axis_t[j], bt) < 1e-9) bj = j
 
+    // Legend rows: the ramp maps a cell to round(3*(v-lo)/(hi-lo)), so the
+    // symbol boundaries sit at 1/6, 1/2 and 5/6 of the [lo, hi] span. X
+    // reports the lowest RMSE on this grid.
+    sym = (" ", "X", "#", "+", "-", ".")
+    des = ("RMSE",
+           "Best RMSE (" + trop_ad_num(min(Sm)) + ")",
+           trop_ad_num(lo) + " to " + trop_ad_num(lo + (hi - lo) / 6),
+           trop_ad_num(lo + (hi - lo) / 6) + " to " + trop_ad_num(lo + (hi - lo) / 2),
+           trop_ad_num(lo + (hi - lo) / 2) + " to " + trop_ad_num(lo + 5 * (hi - lo) / 6),
+           trop_ad_num(lo + 5 * (hi - lo) / 6) + " to " + trop_ad_num(hi))
+    dw = 0
+    for (k = 1; k <= cols(des); k++) dw = max((dw, strlen(des[k])))
+    bw = dw + 8
+    nl = cols(sym) + 2
+    leg = J(1, nl, "")
+    line = "+- Legend "
+    while (strlen(line) < bw - 1) line = line + "-"
+    leg[1] = line + "+"
+    for (k = 1; k <= cols(sym); k++)
+        leg[k + 1] = "| " + sym[k] + " | " + trop_ad_pad(des[k], dw) + " |"
+    line = "+"
+    while (strlen(line) < bw - 1) line = line + "-"
+    leg[nl] = line + "+"
+    li = 1
+    LW = 2 * nu + 13                  // width of the heatmap's left column
+
+    // Bottom-align: attachment slots are title + nt rows + border = nt + 2;
+    // start attaching so the legend's last line lands on the border.
+    slot  = 0
+    start = nt + 2 - nl + 1
+    if (start < 1) start = 1
+
     printf("{txt}Visualisation of RMSE across lambda time and unit (X lowest RMSE, . highest RMSE)\n")
     if (rescale)
         printf("{txt}     Each cell shows the lowest RMSE across all lambda_nn's searched in the adapted range.\n")
     else
         printf("{txt}     Each cell shows the lowest RMSE across all lambda_nn's searched.\n")
     printf("{txt}\n")
-    printf("{txt}Lambda time\n")
+    left = "Lambda time"
+    slot++
+    if (slot >= start & li <= nl) {
+        printf("{txt}%s      %s\n", trop_ad_pad(left, LW), leg[li])
+        li++
+    }
+    else printf("{txt}%s\n", left)
     for (j = nt; j >= 1; j--) {
         line = ""
         for (i = 1; i <= nu; i++) {
@@ -2247,11 +2283,23 @@ void trop_ad_heat(transmorphic A,
         }
         // label the top and bottom rows only
         lab = ((j == nt | j == 1) ? trop_ad_num(axis_t[j]) : "")
-        printf("{txt}%9s |%s |\n", lab, line)
+        left = sprintf("%9s |%s |", lab, line)
+        slot++
+        if (slot >= start & li <= nl) {
+            printf("{txt}%s      %s\n", trop_ad_pad(left, LW), leg[li])
+            li++
+        }
+        else printf("{txt}%s\n", left)
     }
     line = ""
     for (c = 1; c <= 2 * nu + 1; c++) line = line + "-"
-    printf("{txt}          +%s+\n", line)
+    left = "          +" + line + "+"
+    slot++
+    if (slot >= start & li <= nl) {
+        printf("{txt}%s      %s\n", trop_ad_pad(left, LW), leg[li])
+        li++
+    }
+    else printf("{txt}%s\n", left)
 
     ticks = ""
     prev = 0
@@ -2266,7 +2314,16 @@ void trop_ad_heat(transmorphic A,
         ticks = ticks + lab
         prev = pos + strlen(lab) - 1
     }
-    printf("{txt}%s    Lambda unit\n", ticks)
+    left = ticks + "    Lambda unit"
+    if (li <= nl) {
+        printf("{txt}%s      %s\n", trop_ad_pad(left, LW), leg[li])
+        li++
+    }
+    else printf("{txt}%s\n", left)
+    while (li <= nl) {
+        printf("{txt}%s      %s\n", trop_ad_pad("", LW), leg[li])
+        li++
+    }
     printf("{txt}\n")
     displayflush()
 }
@@ -2329,12 +2386,75 @@ void trop_adaptive_eval(
 end
 
 mata:
+// Position-indexed display of a sweep grid, with the winning value bracketed.
+void trop_ad_gridline(string scalar name, real rowvector grid, real scalar best)
+{
+    real scalar   k, hit
+    string scalar line, lab
+
+    line = ""
+    for (k = 1; k <= cols(grid); k++) {
+        lab = trop_ad_num(grid[k])
+        if (grid[k] >= .) hit = (best >= .)
+        else              hit = (best < . & reldif(grid[k], best) < 1e-9)
+        if (hit) line = line + " [" + lab + "]"
+        else     line = line + " "  + lab
+    }
+    printf("{txt}    %-12s%s\n", name, line)
+    displayflush()
+}
+end
+
+mata:
+void trop_ad_bracket(real rowvector s, real scalar b, real scalar edge_factor,
+                     real scalar lo, real scalar hi, real scalar tick)
+{
+    real scalar ns, j, k
+
+    tick = .
+    ns = cols(s)
+    if (ns < 2) {
+        lo = s[1]; hi = s[1]
+        return
+    }
+    k = 0
+    for (j = 1; j <= ns; j++) {
+        if (reldif(s[j], b) < 1e-9) {
+            k = j
+            break
+        }
+    }
+    if (k == 0) {                        // no match: keep the full span
+        lo = s[1]; hi = s[ns]
+        return
+    }
+    if (k == 1) {
+        hi = s[2]
+        if (s[1] > 0) {
+            tick = s[1]
+            lo   = max((s[1] - edge_factor * (s[2] - s[1]), 0))
+        }
+        else lo = s[1]
+    }
+    else if (k == ns) {
+        lo   = s[ns-1]
+        tick = s[ns]
+        hi   = s[ns] + edge_factor * (s[ns] - s[ns-1])
+    }
+    else {
+        lo = s[k-1]
+        hi = s[k+1]
+    }
+}
+end
+
+mata:
 real rowvector trop_cv_adaptive(
     real matrix Y, real matrix W,
     pointer(real colvector) rowvector sets, real matrix cells, real scalar is_cell,
-    real scalar lo_u, real scalar hi_u, real scalar tune_u,
-    real scalar lo_t, real scalar hi_t, real scalar tune_t,
-    real scalar lo_n, real scalar hi_n, real scalar tune_n, real scalar nn_inf_only,
+    real rowvector g_u, real scalar tune_u,
+    real rowvector g_t, real scalar tune_t,
+    real rowvector g_n, real scalar tune_n, real scalar nn_inf_only,
     real scalar npts, real scalar max_exp,
     real scalar tol, real scalar max_iter, real scalar vb,
     real scalar phases_used)
@@ -2342,36 +2462,131 @@ real rowvector trop_cv_adaptive(
     real scalar    phase, bu, bt, bn, bs, bd_u, bd_t, bd_n
     real scalar    span, half, nl, nh, zoomed, t0, done, resumed
     real scalar    tick_u, tick_t, tick_n, gmin, gmax
+    real scalar    edge_factor, nn_has_inf, fl, fh, k, sc, chg
+    real scalar    lo_u, hi_u, lo_t, hi_t, lo_n, hi_n
     real scalar    flo_u, fhi_u, flo_t, fhi_t, flo_n, fhi_n
     real scalar    ispan_u, ispan_t, ispan_n
-    real rowvector axis_u, axis_t, axis_n
+    real rowvector axis_u, axis_t, axis_n, su, stg, sn
+    string colvector keys
+    string rowvector parts
     transmorphic   A
 
     A  = asarray_create()
+    edge_factor = 4
     bu = .; bt = .; bn = .; bs = .
     tick_u = .; tick_t = .; tick_n = .
     gmin = .; gmax = .
     phases_used = 0
     t0 = trop_ms_now()
     done = 0
-    ispan_u = hi_u - lo_u
-    ispan_t = hi_t - lo_t
-    ispan_n = hi_n - lo_n
 
-    printf("{txt}Adaptive CV searching over %gx%gx%g grid of lambdas; points() and expansions() control its cost.\n",
-           (tune_u ? npts : 1), (tune_t ? npts : 1),
-           (nn_inf_only ? 1 : (tune_n ? npts + 1 : 1)))
+    // Sorted unique finite sweep grids. Fixed lambdas arrive as single-value
+    // grids (the command body collapses them before CV starts).
+    su  = uniqrows(select(g_u, g_u :< .)')'
+    stg = uniqrows(select(g_t, g_t :< .)')'
+    nn_has_inf = (sum(g_n :>= .) > 0)
+    if (nn_inf_only) sn = J(1, 0, .)
+    else             sn = uniqrows(select(g_n, g_n :< .)')'
+
+    ispan_u = (cols(su)  > 1 ? su[cols(su)]   - su[1]  : .)
+    ispan_t = (cols(stg) > 1 ? stg[cols(stg)] - stg[1] : .)
+    ispan_n = (cols(sn)  > 1 ? sn[cols(sn)]   - sn[1]  : .)
+
+    //--- Phase 1: sweep the supplied grids literally ---//
+    axis_u = su
+    axis_t = stg
+    if (nn_inf_only)     axis_n = (.)
+    else if (nn_has_inf) axis_n = sn, (.)
+    else                 axis_n = sn
+
+    printf("{txt}Adaptive CV: phase 1 sweeps the %gx%gx%g starting grid of lambdas;\n",
+           cols(axis_u), cols(axis_t), cols(axis_n))
+    printf("{txt}later phases refine around the winner; points() and expansions() control their cost.\n")
     printf("{txt} \n")
+    printf("{txt}  Phase 1: Sweeping the %gx%gx%g (unit, time, nuclear norm) starting grid.\n",
+           cols(axis_u), cols(axis_t), cols(axis_n))
+    printf("{txt}\n")
     displayflush()
+    trop_adaptive_eval(Y, W, sets, cells, is_cell,
+                       axis_u, axis_t, axis_n, A, tol, max_iter,
+                       bu, bt, bn, bs)
+    if (bs >= .) {
+        errprintf("trop_cv_adaptive(): all CV scores are missing.\n")
+        exit(498)
+    }
+    phases_used = 1
+
+    bd_u = (tune_u & cols(su) > 1 &
+            ((reldif(bu, su[cols(su)]) < 1e-9) |
+             (reldif(bu, su[1]) < 1e-9 & su[1] > 0)))
+    bd_t = (tune_t & cols(stg) > 1 &
+            ((reldif(bt, stg[cols(stg)]) < 1e-9) |
+             (reldif(bt, stg[1]) < 1e-9 & stg[1] > 0)))
+    bd_n = (tune_n & !nn_inf_only & bn < . & cols(sn) > 1 &
+            ((reldif(bn, sn[cols(sn)]) < 1e-9) |
+             (reldif(bn, sn[1]) < 1e-9 & sn[1] > 0)))
+    printf("{txt}  Phase 1 chose lambdas (%s, %s, %s)%s\n",
+           trop_ad_num(bu), trop_ad_num(bt), trop_ad_num(bn),
+           ((bd_u | bd_t | bd_n) ? ", on the edge of the swept grid" : ""))
+    displayflush()
+    if (tune_u) trop_ad_gridline("Lambda unit", axis_u, bu)
+    if (tune_t) trop_ad_gridline("Lambda time", axis_t, bt)
+    if (tune_n & !nn_inf_only) trop_ad_gridline("Lambda nn", axis_n, bn)
+    if (vb) {
+        printf("{txt}\n")
+        trop_ad_heat(A, axis_u, axis_t, axis_n, bu, bt, 0, gmin, gmax)
+    }
+
+    //--- Bracket the winner between its neighbouring grid points ---//
+    lo_u = su[1];  hi_u = su[cols(su)]
+    lo_t = stg[1]; hi_t = stg[cols(stg)]
+    if (nn_inf_only) {
+        lo_n = .; hi_n = .
+    }
+    else {
+        lo_n = sn[1]; hi_n = sn[cols(sn)]   // bn = inf keeps the full finite span
+    }
+    if (tune_u) trop_ad_bracket(su, bu, edge_factor, lo_u, hi_u, tick_u)
+    if (tune_t) trop_ad_bracket(stg, bt, edge_factor, lo_t, hi_t, tick_t)
+    if (tune_n & !nn_inf_only & bn < .)
+        trop_ad_bracket(sn, bn, edge_factor, lo_n, hi_n, tick_n)
+
+    if ((tune_u & cols(su) > 1) | (tune_t & cols(stg) > 1) |
+        (tune_n & !nn_inf_only & cols(sn) > 1)) {
+        if (!vb) printf("{txt}\n")
+        printf("{txt} Adapting search grid:\n")
+        if (tune_u & cols(su) > 1) {
+            fl = min((su[1], lo_u)); fh = max((su[cols(su)], hi_u))
+            trop_ad_rangeline("Lambda unit", fl, fh, lo_u, hi_u, tick_u, .,
+                "   [" + trop_ad_num(lo_u) + " ; " + trop_ad_num(hi_u) + "]",
+                ispan_u)
+        }
+        if (tune_t & cols(stg) > 1) {
+            fl = min((stg[1], lo_t)); fh = max((stg[cols(stg)], hi_t))
+            trop_ad_rangeline("Lambda time", fl, fh, lo_t, hi_t, tick_t, .,
+                "   [" + trop_ad_num(lo_t) + " ; " + trop_ad_num(hi_t) + "]",
+                ispan_t)
+        }
+        if (tune_n & !nn_inf_only & cols(sn) > 1) {
+            fl = min((sn[1], lo_n)); fh = max((sn[cols(sn)], hi_n))
+            trop_ad_rangeline("Lambda nn", fl, fh, lo_n, hi_n, tick_n, .,
+                "   [" + trop_ad_num(lo_n) + " ; " + trop_ad_num(hi_n) + "]"
+                + (nn_has_inf ? " (and inf)" : ""), ispan_n)
+        }
+        printf("{txt}\n")
+        displayflush()
+    }
 
     while (!done) {
 
     for (phase = phases_used; phase <= max_exp; phase++) {
-        axis_u = (tune_u ? rangen(lo_u, hi_u, npts)' : (lo_u))
-        axis_t = (tune_t ? rangen(lo_t, hi_t, npts)' : (lo_t))
-        if (nn_inf_only)   axis_n = (.)
-        else if (!tune_n)  axis_n = (lo_n)
-        else               axis_n = rangen(lo_n, hi_n, npts)' , (.)
+        axis_u = (tune_u & hi_u > lo_u ? rangen(lo_u, hi_u, npts)' : (lo_u))
+        axis_t = (tune_t & hi_t > lo_t ? rangen(lo_t, hi_t, npts)' : (lo_t))
+        if (nn_inf_only) axis_n = (.)
+        else {
+            axis_n = (tune_n & hi_n > lo_n ? rangen(lo_n, hi_n, npts)' : (lo_n))
+            if (tune_n & nn_has_inf) axis_n = axis_n, (.)
+        }
 
         printf("{txt}  Phase %g: Evaluating %gx%gx%g (unit, time, nuclear norm) grid.\n",
                phase + 1, cols(axis_u), cols(axis_t), cols(axis_n))
@@ -2482,11 +2697,13 @@ real rowvector trop_cv_adaptive(
         }
     }
     if (zoomed) {
-        axis_u = (tune_u ? rangen(lo_u, hi_u, 9)' : (lo_u))
-        axis_t = (tune_t ? rangen(lo_t, hi_t, 9)' : (lo_t))
-        if (nn_inf_only)   axis_n = (.)
-        else if (!tune_n)  axis_n = (lo_n)
-        else               axis_n = rangen(lo_n, hi_n, 9)' , (.)
+        axis_u = (tune_u & hi_u > lo_u ? rangen(lo_u, hi_u, 9)' : (lo_u))
+        axis_t = (tune_t & hi_t > lo_t ? rangen(lo_t, hi_t, 9)' : (lo_t))
+        if (nn_inf_only) axis_n = (.)
+        else {
+            axis_n = (tune_n & hi_n > lo_n ? rangen(lo_n, hi_n, 9)' : (lo_n))
+            if (tune_n & nn_has_inf) axis_n = axis_n, (.)
+        }
         if (!vb) printf("{txt}\n")
         printf("{txt} Adapting search grid:\n")
         if (tune_u) trop_ad_rangeline("Lambda unit", flo_u, fhi_u, lo_u, hi_u, ., .,
@@ -2497,7 +2714,8 @@ real rowvector trop_cv_adaptive(
                         ispan_t)
         if (tune_n & !nn_inf_only)
             trop_ad_rangeline("Lambda nn", flo_n, fhi_n, lo_n, hi_n, ., .,
-                        "   [" + trop_ad_num(lo_n) + " ; " + trop_ad_num(hi_n) + "] (and inf)",
+                        "   [" + trop_ad_num(lo_n) + " ; " + trop_ad_num(hi_n) + "]"
+                        + (nn_has_inf ? " (and inf)" : ""),
                         ispan_n)
         printf("{txt}\n")
         printf("{txt}  Evaluating %g (unit x time) pairs in range, %g nn values each\n",
@@ -2590,6 +2808,25 @@ real rowvector trop_cv_adaptive(
     }
 
     }   // end outer while
+
+    chg = 0
+    keys = asarray_keys(A)
+    for (k = 1; k <= rows(keys); k++) {
+        sc = asarray(A, keys[k])
+        if (sc < . & sc < bs) {
+            parts = tokens(subinstr(keys[k], "|", " "))
+            bs = sc
+            bu = strtoreal(parts[1])
+            bt = strtoreal(parts[2])
+            bn = strtoreal(parts[3])
+            chg = 1
+        }
+    }
+    if (chg) {
+        printf("{txt}  Best over all evaluated lambdas (%s, %s, %s)\n",
+               trop_ad_num(bu), trop_ad_num(bt), trop_ad_num(bn))
+        displayflush()
+    }
 
     return((bu, bt, bn))
 }
