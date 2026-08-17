@@ -220,39 +220,7 @@ To reduce resample computational time, reduce no of trials or set lambdas.
 ----------------------------------------------------------------
 ```
  
-This takes about twenty minutes and moves the estimate slightly closer to zero. The cycle search converged after three passes at `lambda_unit = 0.8` and `lambda_time = 2`, both interior to the default grids. With a single treated cell, `group(cell)` and `group(time)` target the same estimand, so LOOCV gives a directly comparable estimate:
-```s
-trop y unit time w_single, group(cell) cv(loocv, cells(200) seed(1))
-```
- 
-```
-Cross-validating lambdas using loocv with cycle search, and 200 samples of 5327 total control cells.
-To reduce loocv computational time, reduce number of cells or set lambdas.
-  marginal:  lambda_time -> 4   lambda_unit -> 2   lambda_nn -> .25   1:10 elapsed
-  cycle 1 of up to 50:  lambda_unit -> 2   lambda_time -> 4   lambda_nn -> .025   4:48 elapsed
-  cycle 2 of up to 50:  lambda_unit -> 2   lambda_time -> 4   lambda_nn -> .025   14:46 elapsed
-  converged after 2 cycle(s), 14:46 total
-
-----------------------------------------------------------------
-        TROP |  Triply Robust Panel estimator
--------------+--------------------------------------------------
-         ATT |     0.01512
-             |  (no inference; vce(noinference))
--------------+--------------------------------------------------
-     N units |         111
-   T periods |          48
-   N treated |           1
--------------+--------------------------------------------------
- lambda_unit |      2.0000
- lambda_time |      4.0000
-   lambda_nn |        .025
-             |  (selected by loocv CV)
-----------------------------------------------------------------
-```
-
-LOOCV lands closer to zero (0.015 against 0.024). LOOCV finished in 14:46 but scored only 200 of the 5,327 control cells, set by `cells(200)`. Full LOOCV on this panel is considerably slower than the resample run. `lambda_unit = 2` and `lambda_time = 4` are the largest values in the default grids, and when cross-validation selects a boundary the grid is probably too narrow, so the reported optimum may be a result of lying on the edge of the grid (rather than at a minimum). 
-
-The `adaptive` search instead sweeps a coarse grid, widens it whenever the winner lands on an edge, and zooms in on the best point. With `verbose` it prints an RMSE heat map after each phase which you can see by expanding the output below:
+This takes about twenty minutes and moves the estimate slightly closer to zero. The cycle search converged after three passes at `lambda_unit = 0.8` and `lambda_time = 2`, both interior to the default grids. We used cycle but it may be that our lambda grid which we searched was too sparse. The `adaptive` search instead sweeps a coarse grid, widens it whenever the winner lands on an edge, and zooms in on the best point. With `verbose` it prints an RMSE heat map after each phase which you can see by expanding the output below:
 
 ```s
 trop y unit time w_single, cv(resample adaptive, trials(200)) verbose
@@ -488,7 +456,40 @@ Selected lambda: unit, time and nn = [2.266667 ; 4.951389 ; .0004514]
 ----------------------------------------------------------------
 ```
 
-Adaptive lands on lambdas close to what LOOCV picked (large `lambda_unit` and `lambda_time`, small `lambda_nn`), and reaches a lower CV RMSE than either cycle run (.016 against .0164 on the starting grid). It costs about seven hours here against twenty minutes for cycle, so it is worth reaching for when you suspect the cycle search has stopped at a local optimum, or when the chosen lambdas sit on the edge of the default grids, as they do under LOOCV above.
+Adaptive reaches a lower CV RMSE than the cycle. It costs about seven hours here against twenty minutes for cycle, so it is worth reaching for when you suspect the cycle search has stopped at a local optimum or when the chosen lambdas sit on the edge of the default grids.
+
+Next, let's try leave-one-out cross validation (LOOCV):
+```s
+trop y unit time w_single, group(cell) cv(loocv, cells(200) seed(1))
+```
+ 
+```
+Cross-validating lambdas using loocv with cycle search, and 200 samples of 5327 total control cells.
+To reduce loocv computational time, reduce number of cells or set lambdas.
+  marginal:  lambda_time -> 4   lambda_unit -> 2   lambda_nn -> .25   1:10 elapsed
+  cycle 1 of up to 50:  lambda_unit -> 2   lambda_time -> 4   lambda_nn -> .025   4:48 elapsed
+  cycle 2 of up to 50:  lambda_unit -> 2   lambda_time -> 4   lambda_nn -> .025   14:46 elapsed
+  converged after 2 cycle(s), 14:46 total
+
+----------------------------------------------------------------
+        TROP |  Triply Robust Panel estimator
+-------------+--------------------------------------------------
+         ATT |     0.01512
+             |  (no inference; vce(noinference))
+-------------+--------------------------------------------------
+     N units |         111
+   T periods |          48
+   N treated |           1
+-------------+--------------------------------------------------
+ lambda_unit |      2.0000
+ lambda_time |      4.0000
+   lambda_nn |        .025
+             |  (selected by loocv CV)
+----------------------------------------------------------------
+```
+
+LOOCV lands closer to zero (0.015 against 0.021). LOOCV finished in 14:46 but scored only 200 of the 5,327 control cells, set by `cells(200)`. Full LOOCV on this panel is considerably slower than the resample run. `lambda_unit = 2` and `lambda_time = 4` are the largest values in the default grids, and when cross-validation selects a boundary the grid is probably too narrow, so the reported optimum may be a result of lying on the edge of the grid (rather than at a minimum). 
+
 
 ### Block adoption
  
