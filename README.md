@@ -190,8 +190,7 @@ trop y unit time w_single, lambda_unit(0.3) lambda_time(0.325) lambda_nn(0.1)
 ----------------------------------------------------------------
 ```
 
-The ATT here is close to zero, but we'd prefer to use a cross-validation method to select these parameters. Let's see how the cross-validation results compare, beginning with using a resampling CV method:
-
+No unit is actually treated in this null effect study, so the true effect is zero and the estimate here is small. Using set lambdas are good for a first run, but they were chosen arbitrarily so let's use cross-validation to choose them. We will begin by using resampling cross-validation:
 ```s
 trop y unit time w_single, cv(resample, seed(1))
 ```
@@ -221,7 +220,7 @@ To reduce resample computational time, reduce no of trials or set lambdas.
 ----------------------------------------------------------------
 ```
  
-Cross-validation in general is intensive, and takes about 20 minutes. The ATT is lower than under the lambdas we provided. Let's see how it compares to using LOOCV under `group(cell)`:
+This takes about twenty minutes and moves the estimate slightly closer to zero. The cycle search converged after three passes at `lambda_unit = 0.8` and `lambda_time = 2`, both interior to the default grids. With a single treated cell, `group(cell)` and `group(time)` target the same estimand, so LOOCV gives a directly comparable estimate:
 ```s
 trop y unit time w_single, group(cell) cv(loocv, cells(200) seed(1))
 ```
@@ -251,8 +250,246 @@ To reduce loocv computational time, reduce number of cells or set lambdas.
 ----------------------------------------------------------------
 ```
 
-LOOCV appears to choose lambdas which result in a lower RMSE than resample, and has a slightly shorter computational time.
+LOOCV lands closer to zero (0.015 against 0.024). LOOCV finished in 14:46 but scored only 200 of the 5,327 control cells, set by `cells(200)`. Full LOOCV on this panel is considerably slower than the resample run. `lambda_unit = 2` and `lambda_time = 4` are the largest values in the default grids, and when cross-validation selects a boundary the grid is probably too narrow, so the reported optimum may be a result of lying on the edge of the grid (rather than at a minimum). 
+
+The `adaptive` search instead sweeps a coarse grid, widens it whenever the winner lands on an edge, and zooms in on the best point. With `verbose` it prints an RMSE heat map after each phase which you can see by expanding the output below:
+
+```s
+trop y unit time w_single, cv(resample adaptive, trials(200)) verbose
+```
+
+<details>
+<summary><b>Full adaptive cross-validation log</b> (4 phases, 6 hours 51 minutes total)</summary>
+
+```
+Cross-validating lambdas using resample with adaptive search, and 200 trials (seed 0).
+To reduce resample computational time, reduce no of trials or set lambdas.
+Adaptive CV: phase 1 sweeps the 9x11x9 starting grid of lambdas;
+later phases refine around the winner; points() and expansions() control their cost.
  
+  Phase 1: Sweeping the 9x11x9 (unit, time, nuclear norm) starting grid.
+
+  First replication 0:23, roughly 37:57 expected in total
+    5%  (5/99)   7:06 elapsed   about 2:13:28 remaining
+   10%  (10/99)   18:05 elapsed   about 2:40:56 remaining
+   15%  (15/99)   24:44 elapsed   about 2:18:30 remaining
+   20%  (20/99)   38:03 elapsed   about 2:30:17 remaining
+   25%  (25/99)   44:36 elapsed   about 2:12:00 remaining
+   30%  (30/99)   57:44 elapsed   about 2:12:47 remaining
+   35%  (35/99)   1:05:04 elapsed   about 1:58:58 remaining
+   40%  (40/99)   1:19:08 elapsed   about 1:56:43 remaining
+   45%  (45/99)   1:26:15 elapsed   about 1:43:30 remaining
+   50%  (50/99)   1:36:49 elapsed   about 1:34:52 remaining
+   55%  (55/99)   1:43:22 elapsed   about 1:22:41 remaining
+   60%  (60/99)   1:52:36 elapsed   about 1:13:11 remaining
+   65%  (65/99)   1:58:43 elapsed   about 1:02:05 remaining
+   70%  (70/99)   2:04:33 elapsed   about 51:35 remaining
+   75%  (75/99)   2:12:31 elapsed   about 42:24 remaining
+   80%  (80/99)   2:18:13 elapsed   about 32:49 remaining
+   85%  (85/99)   2:33:07 elapsed   about 25:13 remaining
+   90%  (90/99)   2:40:46 elapsed   about 16:04 remaining
+   95%  (95/99)   2:54:26 elapsed   about 7:20 remaining
+  100%  (99/99)   2:56:38 elapsed
+  Phase 1 chose lambdas (1.2, 4, .005), on the edge of the swept grid
+    Lambda unit  0 .1 .2 .3 .5 .8 [1.2] 1.6 2
+    Lambda time  0 .025 .05 .1 .2 .35 .5 .75 1 2 [4]
+    Lambda nn    [.005] .01 .025 .05 .1 .25 .5 1 inf
+
+Visualisation of RMSE across lambda time and unit (X lowest RMSE, . highest RMSE)
+     Each cell shows the lowest RMSE across all lambda_nn's searched.
+
+Lambda time
+        4 | + # # # # # X # # |
+          | + # # # # # # # # |
+          | + + + + + + + + # |
+          | + + + + + + + # # |
+          | + + + + + + + + - |      +- Legend --------------+
+          | + + + + + + + - . |      |   | RMSE              |
+          | + + + + + + + - . |      | X | Best RMSE (.0164) |
+          | + + - - - - - - . |      | # | .0164 to .0173    |
+          | + - + + - - - . . |      | + | .0173 to .0191    |
+          | - - - - - - - . . |      | - | .0191 to .0208    |
+        0 | - - - - - - - . . |      | . | .0208 to .0217    |
+          +-------------------+      +-----------------------+
+           0               2    Lambda unit
+
+ Adapting search grid:
+    Lambda unit  0 -------------[============]------- 2   [.8 ; 1.6]
+    Lambda time  0 -----------[==========|============================================] 12   [2 ; 12]
+    Lambda nn    0 []-------------------------------- 1   [0 ; .01] (and inf)
+
+  Phase 2: Evaluating 10x10x11 (unit, time, nuclear norm) grid.
+
+  First replication 1:53, roughly 3:08:20 expected in total
+    5%  (5/100)   5:09 elapsed   about 1:37:51 remaining
+   10%  (10/100)   5:54 elapsed   about 53:06 remaining
+   15%  (15/100)   11:01 elapsed   about 1:02:25 remaining
+   20%  (20/100)   11:45 elapsed   about 47:00 remaining
+   25%  (25/100)   17:39 elapsed   about 52:57 remaining
+   30%  (30/100)   18:30 elapsed   about 43:10 remaining
+   35%  (35/100)   24:34 elapsed   about 45:37 remaining
+   40%  (40/100)   25:23 elapsed   about 38:04 remaining
+   45%  (45/100)   31:28 elapsed   about 38:27 remaining
+   50%  (50/100)   32:20 elapsed   about 32:19 remaining
+   55%  (55/100)   38:37 elapsed   about 31:35 remaining
+   60%  (60/100)   39:28 elapsed   about 26:18 remaining
+   65%  (65/100)   45:37 elapsed   about 24:33 remaining
+   70%  (70/100)   46:29 elapsed   about 19:55 remaining
+   75%  (75/100)   52:43 elapsed   about 17:34 remaining
+   80%  (80/100)   53:37 elapsed   about 13:24 remaining
+   85%  (85/100)   59:52 elapsed   about 10:33 remaining
+   90%  (90/100)   1:00:49 elapsed   about 6:45 remaining
+   95%  (95/100)   1:06:50 elapsed   about 3:31 remaining
+  100%  (100/100)   1:07:35 elapsed
+  Phase 2 chose lambdas (1.6, 3.11, .00667), on the edge of the searched range
+    Lambda unit  .8 [===============================*] 1.6
+    Lambda time  2 [======*=====|=====================================================] 12
+    Lambda nn    0 [================|====*==========] .01
+
+Visualisation of RMSE across lambda time and unit (X lowest RMSE, . highest RMSE)
+     Each cell shows the lowest RMSE across all lambda_nn's searched.
+
+Lambda time
+       12 | + + + + + + + + + + |
+          | + + + + + + + + + + |
+          | + + + + + + + + + + |
+          | + + # + + # + + + # |      +- Legend --------------+
+          | + + + + + + + + + + |      |   | RMSE              |
+          | + + + + + + + + + + |      | X | Best RMSE (.0162) |
+          | # # # # # # # # # # |      | # | .0162 to .0171    |
+          | # # # # # # # # # # |      | + | .0171 to .019     |
+          | # # # # # # # # # X |      | - | .019 to .0208     |
+        2 | + + + + + + + + # # |      | . | .0208 to .0217    |
+          +---------------------+      +-----------------------+
+           .8               1.6    Lambda unit
+
+ Expanding search grid: Lambda unit sits on the edge of the range.
+
+  Phase 3: Evaluating 10x10x11 (unit, time, nuclear norm) grid.
+
+   55%  (55/100)   6:34 elapsed   about 5:22 remaining
+   60%  (60/100)   7:18 elapsed   about 4:52 remaining
+   65%  (65/100)   13:53 elapsed   about 7:28 remaining
+   70%  (70/100)   14:47 elapsed   about 6:20 remaining
+   75%  (75/100)   21:23 elapsed   about 7:07 remaining
+   80%  (80/100)   22:17 elapsed   about 5:34 remaining
+   85%  (85/100)   28:51 elapsed   about 5:05 remaining
+   90%  (90/100)   29:37 elapsed   about 3:17 remaining
+   95%  (95/100)   36:01 elapsed   about 1:53 remaining
+  100%  (100/100)   36:52 elapsed
+  Phase 3 chose lambdas (1.87, 4.22, .00111)
+    Lambda unit  .8 [===============|=====*==========] 2.4
+    Lambda time  2 [============|=*===================================================] 12
+    Lambda nn    0 [===*============|===============] .01
+
+Visualisation of RMSE across lambda time and unit (X lowest RMSE, . highest RMSE)
+     Each cell shows the lowest RMSE across all lambda_nn's searched.
+
+Lambda time
+       12 | + + + + + + + + + + |
+          | + + + + + + + + + + |
+          | + + + + + + + + + + |
+          | + + + + + # + + + + |      +- Legend --------------+
+          | + + + + + + + + + + |      |   | RMSE              |
+          | + + + + + + + + + + |      | X | Best RMSE (.0161) |
+          | # # # # # # # # # + |      | # | .0161 to .017     |
+          | # # # # # # X # # # |      | + | .017 to .0189     |
+          | # # # # # # # # # # |      | - | .0189 to .0208    |
+        2 | + + + + + + + + + + |      | . | .0208 to .0217    |
+          +---------------------+      +-----------------------+
+           .8               2.4    Lambda unit
+
+ Adapting search grid:
+    Lambda unit  .8 --------------[===============]--- 2.4   [1.47 ; 2.27]
+    Lambda time  2 [===============================]----------------------------------- 12   [2 ; 6.72]
+    Lambda nn    0 [===========]--------------------- .01   [0 ; .00361] (and inf)
+
+  Evaluating 81 (unit x time) pairs in range, 10 nn values each
+  First replication 2:22, roughly 3:11:42 expected in total
+    5%  (5/81)   9:33 elapsed   about 2:25:09 remaining
+   10%  (9/81)   12:31 elapsed   about 1:40:08 remaining
+   15%  (13/81)   20:28 elapsed   about 1:47:03 remaining
+   20%  (17/81)   24:29 elapsed   about 1:32:10 remaining
+   25%  (21/81)   31:33 elapsed   about 1:30:08 remaining
+   30%  (25/81)   36:28 elapsed   about 1:21:41 remaining
+   35%  (29/81)   41:58 elapsed   about 1:15:15 remaining
+   40%  (33/81)   48:15 elapsed   about 1:10:10 remaining
+   45%  (37/81)   52:23 elapsed   about 1:02:17 remaining
+   50%  (41/81)   59:27 elapsed   about 58:00 remaining
+   55%  (45/81)   1:02:16 elapsed   about 49:48 remaining
+   60%  (49/81)   1:10:38 elapsed   about 46:07 remaining
+   65%  (53/81)   1:14:36 elapsed   about 39:24 remaining
+   70%  (57/81)   1:21:56 elapsed   about 34:29 remaining
+   75%  (61/81)   1:26:29 elapsed   about 28:21 remaining
+   80%  (65/81)   1:34:58 elapsed   about 23:22 remaining
+   85%  (69/81)   1:46:35 elapsed   about 18:32 remaining
+   90%  (73/81)   1:53:07 elapsed   about 12:23 remaining
+   95%  (77/81)   2:06:08 elapsed   about 6:33 remaining
+  100%  (81/81)   2:10:30 elapsed
+
+  Best after zoom (2.27, 4.95, .000451), 6:51:35 total
+    Lambda unit  .8 --------------[==============*]--- 2.4
+    Lambda time  2 [===================*===========]----------------------------------- 12
+    Lambda nn    0 [*==========]--------------------- .01
+
+Visualisation of RMSE across lambda time and unit (X lowest RMSE, . highest RMSE)
+     Each cell shows the lowest RMSE across all lambda_nn's searched in the adapted range.
+
+Lambda time
+     6.72 | . . . . . . . . . |
+          | + + + - - + - - - |
+          | + + + + + # + # + |      +- Legend -------------+
+          | + + + + # # # # X |      |   | RMSE             |
+          | + + + # # + # + + |      | X | Best RMSE (.016) |
+          | + # # # # # # # # |      | # | .016 to .0162    |
+          | + + # + + + + + # |      | + | .0162 to .0167   |
+          | . . - - - - - - - |      | - | .0167 to .0171   |
+        2 | . . . . . . - - - |      | . | .0171 to .0173   |
+          +-------------------+      +----------------------+
+          1.47            2.27    Lambda unit
+
+
+Selected lambda: unit, time and nn = [2.266667 ; 4.951389 ; .0004514]
+
+----------------------------------------------------------------
+        TROP |  Triply Robust Panel estimator
+-------------+--------------------------------------------------
+         ATT |     0.02145
+             |  (no inference; vce(noinference))
+-------------+--------------------------------------------------
+     N units |         111
+   T periods |          48
+   N treated |           1
+-------------+--------------------------------------------------
+ lambda_unit |      2.2667
+ lambda_time |      4.9514
+   lambda_nn |    .0004514
+             |  (selected by resample CV)
+----------------------------------------------------------------
+```
+
+</details>
+
+```
+----------------------------------------------------------------
+        TROP |  Triply Robust Panel estimator
+-------------+--------------------------------------------------
+         ATT |     0.02145
+             |  (no inference; vce(noinference))
+-------------+--------------------------------------------------
+     N units |         111
+   T periods |          48
+   N treated |           1
+-------------+--------------------------------------------------
+ lambda_unit |      2.2667
+ lambda_time |      4.9514
+   lambda_nn |    .0004514
+             |  (selected by resample CV)
+----------------------------------------------------------------
+```
+
+Adaptive lands on lambdas close to what LOOCV picked (large `lambda_unit` and `lambda_time`, small `lambda_nn`), and reaches a lower CV RMSE than either cycle run (.016 against .0164 on the starting grid). It costs about seven hours here against twenty minutes for cycle, so it is worth reaching for when you suspect the cycle search has stopped at a local optimum, or when the chosen lambdas sit on the edge of the default grids, as they do under LOOCV above.
+
 ### Block adoption
  
 Under block adoption, units are treated simultaneously in the final 18 periods. Under `group(time)`, which is the default, this is one pooled spell of 270 cells (15 units × 18 periods):
