@@ -190,7 +190,7 @@ trop y unit time w_single, lambda_unit(0.3) lambda_time(0.325) lambda_nn(0.1)
 ----------------------------------------------------------------
 ```
 
-No unit is actually treated in this null effect study, so the true effect is zero and the estimate here is small. Using set lambdas are good for a first run, but they were chosen arbitrarily so let's use cross-validation to choose them. We will begin by using resampling cross-validation:
+No unit is actually treated in this null effect study, so the true effect is zero and the estimate here is small. Using set lambdas are good for a first run, but they were chosen arbitrarily. Let's use cross-validation to choose the lambdas using a data-driven approach instead. We will begin by using resampling cross-validation:
 ```s
 trop y unit time w_single, cv(resample, seed(1))
 ```
