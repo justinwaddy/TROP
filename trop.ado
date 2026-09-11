@@ -5,8 +5,10 @@
 
 /*
 Versions
+0.2.9 September 11, 2026: Fixed group(time) to mask treated units from the fit, and tau is now estimated
+      using the residual.
 0.2.8 August 13, 2026: Adaptive CV now begins with a sweep of the full lambda grids (the defaults are the same
-      grids used by cycle and joint). Verbose heatmap now has a Legend, which maps each symbol to its RMSE range.
+      grids used by cycle and joint). Verbose heatmap now has a Legend each symbol to its RMSE range.
 0.2.7 August 7, 2026: Added adaptive CV, vce(jackknife) and progress bars. Verbose shows ASCII visual of adaptive CV.
 0.2.6 August 4, 2026: Pooled (group(time)) fixed to correctly mask other treated units/current time period for unit distances.
       Added pooled_treat_distance(time() unit()) option for group(time): allows you to set how distances to own treated group
@@ -958,7 +960,7 @@ void trop_nuclear_core(
         if (restart > 0) a_next = 1
 
         if (cv_mode) {
-            tau_new = coef[p]
+            tau_new = sum(W :* R) / sum(W)
             dtau = (tau_old < . ? abs(tau_new - tau_old) / (1 + abs(tau_old)) : .)
             L_prev = L; L = L_new; a = a_next; tau_old = tau_new
             if (dtau < tol) break
@@ -967,7 +969,7 @@ void trop_nuclear_core(
             coef    = Ginv * trop_suff_rhs(delta, Y - L_new, W)
             R       = (Y - L_new) - trop_coef_to_fit(coef, W, N, T)
             obj_new = sum(delta :* (R:^2)) + lambda_nn * nucnorm
-            tau_new = coef[p]
+            tau_new = sum(W :* R) / sum(W)
             normL   = sqrt(sum(L:^2))
             dL   = sqrt(sum((L_new - L):^2)) / (1 + normL)
             dtau = (tau_old < . ? abs(tau_new - tau_old) / (1 + abs(tau_old)) : .)
@@ -977,7 +979,7 @@ void trop_nuclear_core(
         }
     }
     coef = Ginv * trop_suff_rhs(delta, Y - L, W)
-    tau  = coef[p]
+    tau  = sum(W :* ((Y - L) - trop_coef_to_fit(coef, W, N, T))) / sum(W)
 }
 end
 
@@ -999,8 +1001,8 @@ real rowvector trop_nuclear_path_suff(
 
     Ginv = trop_suff_ginv(delta, W)         // built ONCE, reused across the path
 
-    coef = Ginv * trop_suff_rhs(delta, Y, W)   // WLS tau for any inf (.) entries
-    twls = coef[p]
+    coef = Ginv * trop_suff_rhs(delta, Y, W)
+    twls = sum(W :* (Y - trop_coef_to_fit(coef, W, rows(Y), cols(Y)))) / sum(W)
 
     fin_pos = selectindex(nn_grid :< .)     // positions of finite lambda_nn (row in -> row out)
     inf_pos = selectindex(nn_grid :>= .)    // positions of infinite (missing) lambda_nn
@@ -1069,8 +1071,7 @@ real rowvector trop_placebo_rmse_path(
             sz    = sum(mask)
             omega = trop_unit_weights2(Yc, Wp, us, per, lu, 1)
             theta = trop_time_weights2(T, per, lt, 1)
-            f     = (1 :- Wp) :+ Wp :* mask
-            delta = f :* (omega * theta)
+            delta = (1 :- Wp) :* (omega * theta)
             it_out = .
             taus_g = trop_nuclear_path_suff(Yc, mask, delta, nn_grid,
                                             tol, max_iter, cv_mode, it_out)
@@ -1548,8 +1549,7 @@ real scalar trop_target_tau(real matrix Y, real matrix W, real matrix target_mas
     T = cols(Y)
     omega = trop_unit_weights2(Y, W, tu1, tp1, lu, pooled)
     theta = trop_time_weights2(T, tp1, lt, pooled)
-    f     = (1 :- W) :+ W :* target_mask
-    delta = f :* (omega * theta)
+    delta = (1 :- W) :* (omega * theta)
 
     mxit   = (cv_mode ? 3000 : 5000)
     it_out = .
@@ -1882,8 +1882,7 @@ real rowvector trop_loocv_cell_rmse_path(
         mask[i,t] = 1
         omega = trop_unit_weights2(Y, W, i, t, lu, 0)
         theta = trop_time_weights2(T, t, lt, 0)
-        f     = (1 :- W) :+ W :* mask
-        delta = f :* (omega * theta)
+        delta = (1 :- W) :* (omega * theta)
         it_out = .
         taus = trop_nuclear_path_suff(Y, mask, delta, nn_grid, tol, max_iter, 1, it_out)
         for (g = 1; g <= ng; g++) {
