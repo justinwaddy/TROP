@@ -1,5 +1,5 @@
 *! trop: Triply Robust Panel Estimators
-*! Version 0.2.8 August 17, 2026
+*! Version 0.2.9 September 11, 2026
 *! Author: Clarke Damian, Justin Waddy
 *! dclarke@fen.uchile.cl, j.waddy@exeter.ac.uk
 
