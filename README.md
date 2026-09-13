@@ -198,10 +198,10 @@ trop y unit time w_single, cv(resample, seed(1))
 ```
 Cross-validating lambdas using resample with cycle search, and 200 trials (seed 1).
 To reduce resample computational time, reduce no of trials or set lambdas.
-  cycle 1 of up to 50:  lambda_unit -> .2   lambda_time -> 2   lambda_nn -> .05   4:26 elapsed
-  cycle 2 of up to 50:  lambda_unit -> .8   lambda_time -> 2   lambda_nn -> .05   12:11 elapsed
-  cycle 3 of up to 50:  lambda_unit -> .8   lambda_time -> 2   lambda_nn -> .05   21:11 elapsed
-  converged after 3 cycle(s), 21:11 total
+  cycle 1 of up to 50:  lambda_unit -> .2   lambda_time -> 2   lambda_nn -> .05   4:38 elapsed
+  cycle 2 of up to 50:  lambda_unit -> .8   lambda_time -> 2   lambda_nn -> .05   12:24 elapsed
+  cycle 3 of up to 50:  lambda_unit -> .8   lambda_time -> 2   lambda_nn -> .05   20:05 elapsed
+  converged after 3 cycle(s), 20:05 total
 
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
@@ -227,7 +227,7 @@ trop y unit time w_single, cv(resample adaptive, trials(200)) verbose
 ```
 
 <details>
-<summary><b>Full adaptive cross-validation log</b> (4 phases, 6 hours 51 minutes total)</summary>
+<summary><b>Full adaptive cross-validation log</b> (4 phases, 11 hours 37 minutes total)</summary>
 
 ```
 Cross-validating lambdas using resample with adaptive search, and 200 trials (seed 0).
@@ -237,27 +237,27 @@ later phases refine around the winner; points() and expansions() control their c
  
   Phase 1: Sweeping the 9x11x9 (unit, time, nuclear norm) starting grid.
 
-  First replication 0:23, roughly 37:57 expected in total
-    5%  (5/99)   7:06 elapsed   about 2:13:28 remaining
-   10%  (10/99)   18:05 elapsed   about 2:40:56 remaining
-   15%  (15/99)   24:44 elapsed   about 2:18:30 remaining
-   20%  (20/99)   38:03 elapsed   about 2:30:17 remaining
-   25%  (25/99)   44:36 elapsed   about 2:12:00 remaining
-   30%  (30/99)   57:44 elapsed   about 2:12:47 remaining
-   35%  (35/99)   1:05:04 elapsed   about 1:58:58 remaining
-   40%  (40/99)   1:19:08 elapsed   about 1:56:43 remaining
-   45%  (45/99)   1:26:15 elapsed   about 1:43:30 remaining
-   50%  (50/99)   1:36:49 elapsed   about 1:34:52 remaining
-   55%  (55/99)   1:43:22 elapsed   about 1:22:41 remaining
-   60%  (60/99)   1:52:36 elapsed   about 1:13:11 remaining
-   65%  (65/99)   1:58:43 elapsed   about 1:02:05 remaining
-   70%  (70/99)   2:04:33 elapsed   about 51:35 remaining
-   75%  (75/99)   2:12:31 elapsed   about 42:24 remaining
-   80%  (80/99)   2:18:13 elapsed   about 32:49 remaining
-   85%  (85/99)   2:33:07 elapsed   about 25:13 remaining
-   90%  (90/99)   2:40:46 elapsed   about 16:04 remaining
-   95%  (95/99)   2:54:26 elapsed   about 7:20 remaining
-  100%  (99/99)   2:56:38 elapsed
+  First replication 0:35, roughly 57:45 expected in total
+    5%  (5/99)   9:21 elapsed   about 2:55:46 remaining
+   10%  (10/99)   22:48 elapsed   about 3:22:55 remaining
+   15%  (15/99)   31:43 elapsed   about 2:57:36 remaining
+   20%  (20/99)   49:04 elapsed   about 3:13:48 remaining
+   25%  (25/99)   55:15 elapsed   about 2:43:32 remaining
+   30%  (30/99)   1:03:48 elapsed   about 2:26:44 remaining
+   35%  (35/99)   1:07:33 elapsed   about 2:03:31 remaining
+   40%  (40/99)   1:14:56 elapsed   about 1:50:31 remaining
+   45%  (45/99)   1:20:26 elapsed   about 1:36:31 remaining
+   50%  (50/99)   1:27:56 elapsed   about 1:26:10 remaining
+   55%  (55/99)   1:34:50 elapsed   about 1:15:52 remaining
+   60%  (60/99)   1:49:51 elapsed   about 1:11:24 remaining
+   65%  (65/99)   2:03:08 elapsed   about 1:04:24 remaining
+   70%  (70/99)   2:11:58 elapsed   about 54:40 remaining
+   75%  (75/99)   2:21:56 elapsed   about 45:25 remaining
+   80%  (80/99)   2:29:02 elapsed   about 35:23 remaining
+   85%  (85/99)   2:37:02 elapsed   about 25:51 remaining
+   90%  (90/99)   2:45:32 elapsed   about 16:33 remaining
+   95%  (95/99)   2:57:34 elapsed   about 7:28 remaining
+  100%  (99/99)   2:59:26 elapsed
   Phase 1 chose lambdas (1.2, 4, .005), on the edge of the swept grid
     Lambda unit  0 .1 .2 .3 .5 .8 [1.2] 1.6 2
     Lambda time  0 .025 .05 .1 .2 .35 .5 .75 1 2 [4]
@@ -268,14 +268,14 @@ Visualisation of RMSE across lambda time and unit (X lowest RMSE, . highest RMSE
 
 Lambda time
         4 | + # # # # # X # # |
-          | + # # # # # # # # |
+          | # # # # # # # # # |
           | + + + + + + + + # |
           | + + + + + + + # # |
           | + + + + + + + + - |      +- Legend --------------+
-          | + + + + + + + - . |      |   | RMSE              |
-          | + + + + + + + - . |      | X | Best RMSE (.0164) |
-          | + + - - - - - - . |      | # | .0164 to .0173    |
-          | + - + + - - - . . |      | + | .0173 to .0191    |
+          | + + + + + + + - - |      |   | RMSE              |
+          | + + + + + + + - . |      | X | Best RMSE (.0165) |
+          | + + - - - - - - . |      | # | .0165 to .0174    |
+          | + + + + - - - . . |      | + | .0174 to .0191    |
           | - - - - - - - . . |      | - | .0191 to .0208    |
         0 | - - - - - - - . . |      | . | .0208 to .0217    |
           +-------------------+      +-----------------------+
@@ -288,31 +288,31 @@ Lambda time
 
   Phase 2: Evaluating 10x10x11 (unit, time, nuclear norm) grid.
 
-  First replication 1:53, roughly 3:08:20 expected in total
-    5%  (5/100)   5:09 elapsed   about 1:37:51 remaining
-   10%  (10/100)   5:54 elapsed   about 53:06 remaining
-   15%  (15/100)   11:01 elapsed   about 1:02:25 remaining
-   20%  (20/100)   11:45 elapsed   about 47:00 remaining
-   25%  (25/100)   17:39 elapsed   about 52:57 remaining
-   30%  (30/100)   18:30 elapsed   about 43:10 remaining
-   35%  (35/100)   24:34 elapsed   about 45:37 remaining
-   40%  (40/100)   25:23 elapsed   about 38:04 remaining
-   45%  (45/100)   31:28 elapsed   about 38:27 remaining
-   50%  (50/100)   32:20 elapsed   about 32:19 remaining
-   55%  (55/100)   38:37 elapsed   about 31:35 remaining
-   60%  (60/100)   39:28 elapsed   about 26:18 remaining
-   65%  (65/100)   45:37 elapsed   about 24:33 remaining
-   70%  (70/100)   46:29 elapsed   about 19:55 remaining
-   75%  (75/100)   52:43 elapsed   about 17:34 remaining
-   80%  (80/100)   53:37 elapsed   about 13:24 remaining
-   85%  (85/100)   59:52 elapsed   about 10:33 remaining
-   90%  (90/100)   1:00:49 elapsed   about 6:45 remaining
-   95%  (95/100)   1:06:50 elapsed   about 3:31 remaining
-  100%  (100/100)   1:07:35 elapsed
-  Phase 2 chose lambdas (1.6, 3.11, .00667), on the edge of the searched range
+  First replication 1:54, roughly 3:10:00 expected in total
+    5%  (5/100)   5:06 elapsed   about 1:36:54 remaining
+   10%  (10/100)   6:36 elapsed   about 59:24 remaining
+   15%  (15/100)   20:54 elapsed   about 1:58:25 remaining
+   20%  (20/100)   23:43 elapsed   about 1:34:52 remaining
+   25%  (25/100)   40:11 elapsed   about 2:00:33 remaining
+   30%  (30/100)   43:10 elapsed   about 1:40:43 remaining
+   35%  (35/100)   58:25 elapsed   about 1:48:29 remaining
+   40%  (40/100)   1:00:56 elapsed   about 1:31:24 remaining
+   45%  (45/100)   1:15:02 elapsed   about 1:31:42 remaining
+   50%  (50/100)   1:17:32 elapsed   about 1:17:32 remaining
+   55%  (55/100)   1:32:13 elapsed   about 1:15:27 remaining
+   60%  (60/100)   1:34:40 elapsed   about 1:03:06 remaining
+   65%  (65/100)   1:49:07 elapsed   about 58:45 remaining
+   70%  (70/100)   1:51:43 elapsed   about 47:52 remaining
+   75%  (75/100)   2:05:47 elapsed   about 41:55 remaining
+   80%  (80/100)   2:08:15 elapsed   about 32:03 remaining
+   85%  (85/100)   2:22:26 elapsed   about 25:08 remaining
+   90%  (90/100)   2:24:49 elapsed   about 16:05 remaining
+   95%  (95/100)   2:38:59 elapsed   about 8:22 remaining
+  100%  (100/100)   2:41:17 elapsed
+  Phase 2 chose lambdas (1.6, 4.22, .00222), on the edge of the searched range
     Lambda unit  .8 [===============================*] 1.6
-    Lambda time  2 [======*=====|=====================================================] 12
-    Lambda nn    0 [================|====*==========] .01
+    Lambda time  2 [============|=*===================================================] 12
+    Lambda nn    0 [======*=========|===============] .01
 
 Visualisation of RMSE across lambda time and unit (X lowest RMSE, . highest RMSE)
      Each cell shows the lowest RMSE across all lambda_nn's searched.
@@ -321,12 +321,12 @@ Lambda time
        12 | + + + + + + + + + + |
           | + + + + + + + + + + |
           | + + + + + + + + + + |
-          | + + # + + # + + + # |      +- Legend --------------+
+          | + + + # # + + + + + |      +- Legend --------------+
           | + + + + + + + + + + |      |   | RMSE              |
           | + + + + + + + + + + |      | X | Best RMSE (.0162) |
           | # # # # # # # # # # |      | # | .0162 to .0171    |
-          | # # # # # # # # # # |      | + | .0171 to .019     |
-          | # # # # # # # # # X |      | - | .019 to .0208     |
+          | # # # # # # # # # X |      | + | .0171 to .019     |
+          | # # # # # # # # # # |      | - | .019 to .0208     |
         2 | + + + + + + + + # # |      | . | .0208 to .0217    |
           +---------------------+      +-----------------------+
            .8               1.6    Lambda unit
@@ -335,18 +335,18 @@ Lambda time
 
   Phase 3: Evaluating 10x10x11 (unit, time, nuclear norm) grid.
 
-   55%  (55/100)   6:34 elapsed   about 5:22 remaining
-   60%  (60/100)   7:18 elapsed   about 4:52 remaining
-   65%  (65/100)   13:53 elapsed   about 7:28 remaining
-   70%  (70/100)   14:47 elapsed   about 6:20 remaining
-   75%  (75/100)   21:23 elapsed   about 7:07 remaining
-   80%  (80/100)   22:17 elapsed   about 5:34 remaining
-   85%  (85/100)   28:51 elapsed   about 5:05 remaining
-   90%  (90/100)   29:37 elapsed   about 3:17 remaining
-   95%  (95/100)   36:01 elapsed   about 1:53 remaining
-  100%  (100/100)   36:52 elapsed
-  Phase 3 chose lambdas (1.87, 4.22, .00111)
-    Lambda unit  .8 [===============|=====*==========] 2.4
+   55%  (55/100)   14:06 elapsed   about 11:32 remaining
+   60%  (60/100)   16:28 elapsed   about 10:58 remaining
+   65%  (65/100)   30:51 elapsed   about 16:36 remaining
+   70%  (70/100)   33:17 elapsed   about 14:15 remaining
+   75%  (75/100)   47:13 elapsed   about 15:44 remaining
+   80%  (80/100)   49:39 elapsed   about 12:24 remaining
+   85%  (85/100)   1:03:25 elapsed   about 11:11 remaining
+   90%  (90/100)   1:05:52 elapsed   about 7:19 remaining
+   95%  (95/100)   1:19:21 elapsed   about 4:10 remaining
+  100%  (100/100)   1:21:54 elapsed
+  Phase 3 chose lambdas (2.04, 4.22, .00111)
+    Lambda unit  .8 [===============|=========*======] 2.4
     Lambda time  2 [============|=*===================================================] 12
     Lambda nn    0 [===*============|===============] .01
 
@@ -357,81 +357,81 @@ Lambda time
        12 | + + + + + + + + + + |
           | + + + + + + + + + + |
           | + + + + + + + + + + |
-          | + + + + + # + + + + |      +- Legend --------------+
-          | + + + + + + + + + + |      |   | RMSE              |
-          | + + + + + + + + + + |      | X | Best RMSE (.0161) |
-          | # # # # # # # # # + |      | # | .0161 to .017     |
-          | # # # # # # X # # # |      | + | .017 to .0189     |
+          | + + # + + + + + + + |      +- Legend --------------+
+          | + + + + + # + + + + |      |   | RMSE              |
+          | + + + + + + + + + + |      | X | Best RMSE (.0162) |
+          | # # # # # # # # # # |      | # | .0162 to .0171    |
+          | # # # # # # # X # # |      | + | .0171 to .0189    |
           | # # # # # # # # # # |      | - | .0189 to .0208    |
-        2 | + + + + + + + + + + |      | . | .0208 to .0217    |
+        2 | + + + + + + + # # # |      | . | .0208 to .0217    |
           +---------------------+      +-----------------------+
            .8               2.4    Lambda unit
 
  Adapting search grid:
-    Lambda unit  .8 --------------[===============]--- 2.4   [1.47 ; 2.27]
+    Lambda unit  .8 -----------------[===============] 2.4   [1.64 ; 2.4]
     Lambda time  2 [===============================]----------------------------------- 12   [2 ; 6.72]
     Lambda nn    0 [===========]--------------------- .01   [0 ; .00361] (and inf)
 
   Evaluating 81 (unit x time) pairs in range, 10 nn values each
-  First replication 2:22, roughly 3:11:42 expected in total
-    5%  (5/81)   9:33 elapsed   about 2:25:09 remaining
-   10%  (9/81)   12:31 elapsed   about 1:40:08 remaining
-   15%  (13/81)   20:28 elapsed   about 1:47:03 remaining
-   20%  (17/81)   24:29 elapsed   about 1:32:10 remaining
-   25%  (21/81)   31:33 elapsed   about 1:30:08 remaining
-   30%  (25/81)   36:28 elapsed   about 1:21:41 remaining
-   35%  (29/81)   41:58 elapsed   about 1:15:15 remaining
-   40%  (33/81)   48:15 elapsed   about 1:10:10 remaining
-   45%  (37/81)   52:23 elapsed   about 1:02:17 remaining
-   50%  (41/81)   59:27 elapsed   about 58:00 remaining
-   55%  (45/81)   1:02:16 elapsed   about 49:48 remaining
-   60%  (49/81)   1:10:38 elapsed   about 46:07 remaining
-   65%  (53/81)   1:14:36 elapsed   about 39:24 remaining
-   70%  (57/81)   1:21:56 elapsed   about 34:29 remaining
-   75%  (61/81)   1:26:29 elapsed   about 28:21 remaining
-   80%  (65/81)   1:34:58 elapsed   about 23:22 remaining
-   85%  (69/81)   1:46:35 elapsed   about 18:32 remaining
-   90%  (73/81)   1:53:07 elapsed   about 12:23 remaining
-   95%  (77/81)   2:06:08 elapsed   about 6:33 remaining
-  100%  (81/81)   2:10:30 elapsed
+  First replication 5:56, roughly 8:00:36 expected in total
+    5%  (5/81)   23:08 elapsed   about 5:51:37 remaining
+   10%  (9/81)   30:00 elapsed   about 4:00:00 remaining
+   15%  (13/81)   50:18 elapsed   about 4:23:06 remaining
+   20%  (17/81)   59:53 elapsed   about 3:45:26 remaining
+   25%  (21/81)   1:18:02 elapsed   about 3:42:57 remaining
+   30%  (25/81)   1:30:11 elapsed   about 3:22:00 remaining
+   35%  (29/81)   1:45:32 elapsed   about 3:09:13 remaining
+   40%  (33/81)   2:00:11 elapsed   about 2:54:48 remaining
+   45%  (37/81)   2:10:53 elapsed   about 2:35:38 remaining
+   50%  (41/81)   2:27:52 elapsed   about 2:24:15 remaining
+   55%  (45/81)   2:34:17 elapsed   about 2:03:25 remaining
+   60%  (49/81)   2:53:12 elapsed   about 1:53:06 remaining
+   65%  (53/81)   3:02:29 elapsed   about 1:36:24 remaining
+   70%  (57/81)   3:19:41 elapsed   about 1:24:04 remaining
+   75%  (61/81)   3:30:41 elapsed   about 1:09:04 remaining
+   80%  (65/81)   3:44:52 elapsed   about 55:21 remaining
+   85%  (69/81)   3:59:08 elapsed   about 41:35 remaining
+   90%  (73/81)   4:10:01 elapsed   about 27:23 remaining
+   95%  (77/81)   4:27:55 elapsed   about 13:55 remaining
+  100%  (81/81)   4:34:51 elapsed
 
-  Best after zoom (2.27, 4.95, .000451), 6:51:35 total
-    Lambda unit  .8 --------------[==============*]--- 2.4
-    Lambda time  2 [===================*===========]----------------------------------- 12
-    Lambda nn    0 [*==========]--------------------- .01
+  Best after zoom (2.12, 4.36, .000903), 11:37:28 total
+    Lambda unit  .8 -----------------[=========*=====] 2.4
+    Lambda time  2 [===============*===============]----------------------------------- 12
+    Lambda nn    0 [==*========]--------------------- .01
 
 Visualisation of RMSE across lambda time and unit (X lowest RMSE, . highest RMSE)
      Each cell shows the lowest RMSE across all lambda_nn's searched in the adapted range.
 
 Lambda time
      6.72 | . . . . . . . . . |
-          | + + + - - + - - - |
-          | + + + + + # + # + |      +- Legend -------------+
-          | + + + + # # # # X |      |   | RMSE             |
-          | + + + # # + # + + |      | X | Best RMSE (.016) |
-          | + # # # # # # # # |      | # | .016 to .0162    |
-          | + + # + + + + + # |      | + | .0162 to .0167   |
+          | + + + - - - - - - |
+          | + + + + + + + + + |      +- Legend -------------+
+          | + + + # # # # # + |      |   | RMSE             |
+          | # # # + # X # # + |      | X | Best RMSE (.016) |
+          | # # # # # # # # # |      | # | .016 to .0163    |
+          | + # + + + + + # + |      | + | .0163 to .0167   |
           | . . - - - - - - - |      | - | .0167 to .0171   |
-        2 | . . . . . . - - - |      | . | .0171 to .0173   |
+        2 | . . . . . . . - - |      | . | .0171 to .0173   |
           +-------------------+      +----------------------+
-          1.47            2.27    Lambda unit
+          1.64            2.4    Lambda unit
 
 
-Selected lambda: unit, time and nn = [2.266667 ; 4.951389 ; .0004514]
+Selected lambda: unit, time and nn = [2.116667 ; 4.361111 ; .0009028]
 
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
-         ATT |     0.02145
+         ATT |     0.02242
              |  (no inference; vce(noinference))
 -------------+--------------------------------------------------
      N units |         111
    T periods |          48
    N treated |           1
 -------------+--------------------------------------------------
- lambda_unit |      2.2667
- lambda_time |      4.9514
-   lambda_nn |    .0004514
+ lambda_unit |      2.1167
+ lambda_time |      4.3611
+   lambda_nn |    .0009028
              |  (selected by resample CV)
 ----------------------------------------------------------------
 ```
@@ -442,21 +442,21 @@ Selected lambda: unit, time and nn = [2.266667 ; 4.951389 ; .0004514]
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
-         ATT |     0.02145
+         ATT |     0.02242
              |  (no inference; vce(noinference))
 -------------+--------------------------------------------------
      N units |         111
    T periods |          48
    N treated |           1
 -------------+--------------------------------------------------
- lambda_unit |      2.2667
- lambda_time |      4.9514
-   lambda_nn |    .0004514
+ lambda_unit |      2.1167
+ lambda_time |      4.3611
+   lambda_nn |    .0009028
              |  (selected by resample CV)
 ----------------------------------------------------------------
 ```
 
-Adaptive reaches a lower CV RMSE than the cycle. It costs about seven hours here against twenty minutes for cycle, so it is worth reaching for when you suspect the cycle search has stopped at a local optimum or when the chosen lambdas sit on the edge of the default grids.
+Adaptive reaches a lower CV RMSE than the cycle. It costs about twelve hours here against twenty minutes for cycle, so it is worth reaching for when you suspect the cycle search has stopped at a local optimum or when the chosen lambdas sit on the edge of the default grids.
 
 Next, let's try leave-one-out cross validation (LOOCV):
 ```s
@@ -466,36 +466,36 @@ trop y unit time w_single, group(cell) cv(loocv, cells(200) seed(1))
 ```
 Cross-validating lambdas using loocv with cycle search, and 200 samples of 5327 total control cells.
 To reduce loocv computational time, reduce number of cells or set lambdas.
-  marginal:  lambda_time -> 4   lambda_unit -> 2   lambda_nn -> .25   1:10 elapsed
-  cycle 1 of up to 50:  lambda_unit -> 2   lambda_time -> 4   lambda_nn -> .025   4:48 elapsed
-  cycle 2 of up to 50:  lambda_unit -> 2   lambda_time -> 4   lambda_nn -> .025   14:46 elapsed
-  converged after 2 cycle(s), 14:46 total
+  marginal:  lambda_time -> .2   lambda_unit -> 2   lambda_nn -> .005   0:40 elapsed
+  cycle 1 of up to 50:  lambda_unit -> .2   lambda_time -> .2   lambda_nn -> .25   1:54 elapsed
+  cycle 2 of up to 50:  lambda_unit -> .2   lambda_time -> .2   lambda_nn -> .25   2:59 elapsed
+  converged after 2 cycle(s), 2:59 total
 
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
-         ATT |     0.01512
+         ATT |     0.02725
              |  (no inference; vce(noinference))
 -------------+--------------------------------------------------
      N units |         111
    T periods |          48
    N treated |           1
 -------------+--------------------------------------------------
- lambda_unit |      2.0000
- lambda_time |      4.0000
-   lambda_nn |        .025
+ lambda_unit |      0.2000
+ lambda_time |      0.2000
+   lambda_nn |         .25
              |  (selected by loocv CV)
 ----------------------------------------------------------------
 ```
 
-LOOCV lands closer to zero (0.015 against 0.021). LOOCV finished in 14:46 but scored only 200 of the 5,327 control cells, set by `cells(200)`. Full LOOCV on this panel is considerably slower than the resample run. `lambda_unit = 2` and `lambda_time = 4` are the largest values in the default grids, and when cross-validation selects a boundary the grid is probably too narrow, so the reported optimum may be a result of lying on the edge of the grid (rather than at a minimum). Let's try LOOCV using the adaptive approach instead:
+LOOCV finished in 2:59 but scored only 200 of the 5,327 control cells, set by `cells(200)`. Full LOOCV on this panel is considerably slower than the resample run. LOOCV lands slightly further from zero (0.027 against 0.022) and chooses much weaker unit and time weights, `lambda_unit = 0.2` and `lambda_time = 0.2`, both interior to the default grids. The cycle search only moves one lambda at a time over a coarse grid, so let's try LOOCV using the adaptive approach instead:
 
 ```s
-trop y unit time w_single, group(cell) cv(loocv adaptive, cells(200) seed(1)) verbose
+trop y unit time w_single, group(cell) cv(loocv adaptive, cells(200)) verbose
 ```
 
 <details>
-<summary><b>Full adaptive cross-validation log</b> (4 phases, 6 hours 51 minutes total)</summary>
+<summary><b>Full adaptive cross-validation log</b> (6 phases plus zoom, 2 hours 12 minutes total)</summary>
 
 ```
 Cross-validating lambdas using loocv with adaptive search, and 200 samples of 5327 total control cells.
@@ -505,199 +505,311 @@ later phases refine around the winner; points() and expansions() control their c
  
   Phase 1: Sweeping the 9x11x9 (unit, time, nuclear norm) starting grid.
 
-  First replication 0:13, roughly 21:27 expected in total
-    5%  (5/99)   8:05 elapsed   about 2:31:58 remaining
-   10%  (10/99)   22:35 elapsed   about 3:20:59 remaining
-   15%  (15/99)   26:16 elapsed   about 2:27:05 remaining
-   20%  (20/99)   33:43 elapsed   about 2:13:10 remaining
-   25%  (25/99)   36:57 elapsed   about 1:49:22 remaining
-   30%  (30/99)   45:40 elapsed   about 1:45:02 remaining
-   35%  (35/99)   50:34 elapsed   about 1:32:27 remaining
-   40%  (40/99)   1:18:07 elapsed   about 1:55:13 remaining
-   45%  (45/99)   1:25:20 elapsed   about 1:42:24 remaining
-   50%  (50/99)   1:35:31 elapsed   about 1:33:36 remaining
-   55%  (55/99)   1:41:38 elapsed   about 1:21:18 remaining
-   60%  (60/99)   1:50:45 elapsed   about 1:11:59 remaining
-   65%  (65/99)   1:57:52 elapsed   about 1:01:39 remaining
-   70%  (70/99)   2:03:55 elapsed   about 51:20 remaining
-   75%  (75/99)   2:12:26 elapsed   about 42:22 remaining
-   80%  (80/99)   2:19:36 elapsed   about 33:09 remaining
-   85%  (85/99)   7:59:11 elapsed   about 1:18:55 remaining
-   90%  (90/99)   8:14:54 elapsed   about 49:29 remaining
-   95%  (95/99)   8:33:36 elapsed   about 21:37 remaining
-  100%  (99/99)   24:01:09 elapsed
-  Phase 1 chose lambdas (2, 4, .025), on the edge of the swept grid
-    Lambda unit  0 .1 .2 .3 .5 .8 1.2 1.6 [2]
-    Lambda time  0 .025 .05 .1 .2 .35 .5 .75 1 2 [4]
-    Lambda nn    .005 .01 [.025] .05 .1 .25 .5 1 inf
+  First replication 0:11, roughly 18:09 expected in total
+    5%  (5/99)   0:58 elapsed   about 18:10 remaining
+   10%  (10/99)   2:32 elapsed   about 22:32 remaining
+   15%  (15/99)   3:41 elapsed   about 20:37 remaining
+   20%  (20/99)   5:01 elapsed   about 19:48 remaining
+   25%  (25/99)   6:17 elapsed   about 18:35 remaining
+   30%  (30/99)   7:26 elapsed   about 17:05 remaining
+   35%  (35/99)   8:52 elapsed   about 16:12 remaining
+   40%  (40/99)   9:51 elapsed   about 14:31 remaining
+   45%  (45/99)   11:26 elapsed   about 13:43 remaining
+   50%  (50/99)   12:23 elapsed   about 12:08 remaining
+   55%  (55/99)   14:03 elapsed   about 11:14 remaining
+   60%  (60/99)   15:03 elapsed   about 9:46 remaining
+   65%  (65/99)   16:39 elapsed   about 8:42 remaining
+   70%  (70/99)   17:43 elapsed   about 7:20 remaining
+   75%  (75/99)   18:59 elapsed   about 6:04 remaining
+   80%  (80/99)   20:16 elapsed   about 4:48 remaining
+   85%  (85/99)   21:22 elapsed   about 3:31 remaining
+   90%  (90/99)   22:37 elapsed   about 2:15 remaining
+   95%  (95/99)   23:36 elapsed   about 0:59 remaining
+  100%  (99/99)   24:42 elapsed
+  Phase 1 chose lambdas (0, 0, .005), on the edge of the swept grid
+    Lambda unit  [0] .1 .2 .3 .5 .8 1.2 1.6 2
+    Lambda time  [0] .025 .05 .1 .2 .35 .5 .75 1 2 4
+    Lambda nn    [.005] .01 .025 .05 .1 .25 .5 1 inf
 
 Visualisation of RMSE across lambda time and unit (X lowest RMSE, . highest RMSE)
      Each cell shows the lowest RMSE across all lambda_nn's searched.
 
 Lambda time
-        4 | # # # # # # # # X |
-          | # # # # # # # # # |
-          | + + + + + + + + + |
-          | + + + + + + + - - |
-          | - + + + - - - - - |      +- Legend --------------+
-          | - - - - - - - - - |      |   | RMSE              |
-          | - - - - - - - - - |      | X | Best RMSE (.0362) |
-          | - - - - - - . . . |      | # | .0362 to .0377    |
-          | - - - - - - . . . |      | + | .0377 to .0409    |
-          | - - - - . . . . . |      | - | .0409 to .044     |
-        0 | . - . . . . . . . |      | . | .044 to .0456     |
-          +-------------------+      +-----------------------+
+        4 | . - - - . . . . . |
+          | - - - - - - - - - |
+          | + + - + + - + + + |
+          | - + + + + + + + + |
+          | # # # # # # # # # |      +- Legend -----------------+
+          | # # # # # # # # # |      |   | RMSE                 |
+          | # # # # # # # # # |      | X | Best RMSE (3.86e-12) |
+          | # # # # # # # # # |      | # | 3.86e-12 to 1.23e-06 |
+          | # # # # # # # # # |      | + | 1.23e-06 to 3.70e-06 |
+          | # # # # # # # # # |      | - | 3.70e-06 to 6.17e-06 |
+        0 | X # # # # # # # # |      | . | 6.17e-06 to 7.41e-06 |
+          +-------------------+      +--------------------------+
            0               2    Lambda unit
 
  Adapting search grid:
-    Lambda unit  0 ---------------------------[=====|==========================] 3.6   [1.6 ; 3.6]
-    Lambda time  0 -----------[==========|============================================] 12   [2 ; 12]
-    Lambda nn    .005 []-------------------------------- 1   [.01 ; .05] (and inf)
+    Lambda unit  0 [=]------------------------------- 2   [0 ; .1]
+    Lambda time  0 []-------------------------------- 4   [0 ; .025]
+    Lambda nn    0 []-------------------------------- 1   [0 ; .01] (and inf)
 
   Phase 2: Evaluating 10x10x11 (unit, time, nuclear norm) grid.
 
-  First replication 1:40, roughly 2:46:40 expected in total
-    5%  (5/100)   3:01 elapsed   about 57:19 remaining
-   10%  (10/100)   5:04 elapsed   about 45:36 remaining
-   15%  (15/100)   8:06 elapsed   about 45:54 remaining
-   20%  (20/100)   9:51 elapsed   about 39:24 remaining
-   25%  (25/100)   12:33 elapsed   about 37:39 remaining
-   30%  (30/100)   14:33 elapsed   about 33:57 remaining
-   35%  (35/100)   17:46 elapsed   about 32:59 remaining
-   40%  (40/100)   19:55 elapsed   about 29:52 remaining
-   45%  (45/100)   22:50 elapsed   about 27:54 remaining
-   50%  (50/100)   25:02 elapsed   about 25:02 remaining
-   55%  (55/100)   27:57 elapsed   about 22:52 remaining
-   60%  (60/100)   30:12 elapsed   about 20:08 remaining
-   65%  (65/100)   32:57 elapsed   about 17:44 remaining
-   70%  (70/100)   35:13 elapsed   about 15:05 remaining
-   75%  (75/100)   37:49 elapsed   about 12:36 remaining
-   80%  (80/100)   40:02 elapsed   about 10:00 remaining
-   85%  (85/100)   42:34 elapsed   about 7:30 remaining
-   90%  (90/100)   44:47 elapsed   about 4:58 remaining
-   95%  (95/100)   47:12 elapsed   about 2:29 remaining
-  100%  (100/100)   49:26 elapsed
-  Phase 2 chose lambdas (2.27, 12, .01), on the edge of the searched range
-    Lambda unit  1.6 [======|===*=====================] 3.6
-    Lambda time  2 [============|====================================================*] 12
-    Lambda nn    .01 [*===============================] .05
+  First replication 0:14, roughly 23:20 expected in total
+    5%  (5/100)   1:09 elapsed   about 21:51 remaining
+   10%  (10/100)   2:18 elapsed   about 20:42 remaining
+   15%  (15/100)   3:30 elapsed   about 19:50 remaining
+   20%  (20/100)   4:41 elapsed   about 18:44 remaining
+   25%  (25/100)   5:51 elapsed   about 17:33 remaining
+   30%  (30/100)   7:02 elapsed   about 16:24 remaining
+   35%  (35/100)   8:11 elapsed   about 15:11 remaining
+   40%  (40/100)   9:24 elapsed   about 14:06 remaining
+   45%  (45/100)   10:34 elapsed   about 12:54 remaining
+   50%  (50/100)   11:44 elapsed   about 11:44 remaining
+   55%  (55/100)   12:54 elapsed   about 10:33 remaining
+   60%  (60/100)   14:04 elapsed   about 9:22 remaining
+   65%  (65/100)   15:15 elapsed   about 8:12 remaining
+   70%  (70/100)   16:25 elapsed   about 7:02 remaining
+   75%  (75/100)   17:35 elapsed   about 5:51 remaining
+   80%  (80/100)   18:48 elapsed   about 4:42 remaining
+   85%  (85/100)   19:59 elapsed   about 3:31 remaining
+   90%  (90/100)   21:10 elapsed   about 2:21 remaining
+   95%  (95/100)   22:21 elapsed   about 1:10 remaining
+  100%  (100/100)   23:32 elapsed
+  Phase 2 chose lambdas (.1, .025, inf), on the edge of the searched range
+    Lambda unit  0 [===============================*] .1
+    Lambda time  0 [===============================*] .025
+    Lambda nn    0 [================|===============] .01
 
 Visualisation of RMSE across lambda time and unit (X lowest RMSE, . highest RMSE)
      Each cell shows the lowest RMSE across all lambda_nn's searched.
 
 Lambda time
-       12 | # # # X # # # # # # |
+     .025 | # # # # # # # # # X |
           | # # # # # # # # # # |
           | # # # # # # # # # # |
-          | # # # # # # # # # # |      +- Legend -------------+
-          | # # # # # # # # # # |      |   | RMSE             |
-          | # # # # # # # # # # |      | X | Best RMSE (.036) |
-          | # # # # # # # # # # |      | # | .036 to .0376    |
-          | # # # # # # # # # # |      | + | .0376 to .0408   |
-          | # # # # # # # # # # |      | - | .0408 to .044    |
-        2 | # # # # # # # # # # |      | . | .044 to .0456    |
-          +---------------------+      +----------------------+
-          1.6               3.6    Lambda unit
+          | # # # # # # # # # # |      +- Legend -----------------+
+          | # # # # # # # # # # |      |   | RMSE                 |
+          | # # # # # # # # # # |      | X | Best RMSE (1.95e-11) |
+          | # # # # # # # # # # |      | # | 3.86e-12 to 1.23e-06 |
+          | # # # # # # # # # # |      | + | 1.23e-06 to 3.70e-06 |
+          | # # # # # # # # # # |      | - | 3.70e-06 to 6.17e-06 |
+        0 | # # # # # # # # # # |      | . | 6.17e-06 to 7.41e-06 |
+          +---------------------+      +--------------------------+
+           0                 .1    Lambda unit
 
- Expanding search grid: Lambda time and Lambda nn sit on the edge of the range.
+ Expanding search grid: Lambda unit and Lambda time sit on the edge of the range.
 
   Phase 3: Evaluating 10x10x11 (unit, time, nuclear norm) grid.
 
-  First replication 7:31, roughly 12:31:40 expected in total
-    5%  (5/100)   11:16 elapsed   about 3:34:03 remaining
-   10%  (10/100)   12:17 elapsed   about 1:50:33 remaining
-   15%  (15/100)   16:51 elapsed   about 1:35:29 remaining
-   20%  (20/100)   17:49 elapsed   about 1:11:16 remaining
-   25%  (25/100)   22:15 elapsed   about 1:06:45 remaining
-   30%  (30/100)   23:17 elapsed   about 54:19 remaining
-   35%  (35/100)   28:33 elapsed   about 53:01 remaining
-   40%  (40/100)   29:40 elapsed   about 44:30 remaining
-   45%  (45/100)   1:02:58 elapsed   about 1:16:57 remaining
-   50%  (50/100)   1:04:36 elapsed   about 1:04:36 remaining
-   55%  (55/100)   1:12:00 elapsed   about 58:54 remaining
-   60%  (60/100)   1:13:31 elapsed   about 49:00 remaining
-   65%  (65/100)   25:38:45 elapsed   about 13:48:33 remaining
-   70%  (70/100)   25:43:27 elapsed   about 11:01:28 remaining
-   75%  (75/100)   25:56:30 elapsed   about 8:38:50 remaining
-   80%  (80/100)   49:00:42 elapsed   about 12:15:10 remaining
-   85%  (85/100)   49:10:15 elapsed   about 8:40:37 remaining
-   90%  (90/100)   49:11:36 elapsed   about 5:27:57 remaining
-   95%  (95/100)   49:18:51 elapsed   about 2:35:43 remaining
-  100%  (100/100)   49:20:16 elapsed
-  Phase 3 chose lambdas (2.04, 8.67, 0)
-    Lambda unit  1.6 [======*=========================] 3.6
-    Lambda time  2 [=====================*===========|================================] 22
-    Lambda nn    0 [*=====|=========================] .05
+   10%  (10/100)   1:11 elapsed   about 10:39 remaining
+   20%  (20/100)   2:24 elapsed   about 9:36 remaining
+   30%  (30/100)   3:36 elapsed   about 8:24 remaining
+   40%  (40/100)   4:48 elapsed   about 7:12 remaining
+   50%  (50/100)   5:59 elapsed   about 5:59 remaining
+   55%  (55/100)   7:11 elapsed   about 5:52 remaining
+   60%  (60/100)   8:23 elapsed   about 5:35 remaining
+   65%  (65/100)   9:34 elapsed   about 5:09 remaining
+   70%  (70/100)   10:45 elapsed   about 4:36 remaining
+   75%  (75/100)   11:56 elapsed   about 3:58 remaining
+   80%  (80/100)   13:07 elapsed   about 3:16 remaining
+   85%  (85/100)   14:19 elapsed   about 2:31 remaining
+   90%  (90/100)   15:30 elapsed   about 1:43 remaining
+   95%  (95/100)   16:40 elapsed   about 0:52 remaining
+  100%  (100/100)   17:52 elapsed
+  Phase 3 chose lambdas (.2, .05, inf), on the edge of the searched range
+    Lambda unit  0 [================|==============*] .2
+    Lambda time  0 [================|==============*] .05
+    Lambda nn    0 [================|===============] .01
 
 Visualisation of RMSE across lambda time and unit (X lowest RMSE, . highest RMSE)
      Each cell shows the lowest RMSE across all lambda_nn's searched.
 
 Lambda time
-       22 | . . . . . . . . . . |
-          | + + + + + + + + + + |
+      .05 | # # # # # # # # # X |
           | # # # # # # # # # # |
-          | # # # # # # # # # # |      +- Legend --------------+
-          | # # # # # # # # # # |      |   | RMSE              |
-          | # # # # # # # # # # |      | X | Best RMSE (.0346) |
-          | # # X # # # # # # # |      | # | .0346 to .0595    |
-          | # # # # # # # # # # |      | + | .0595 to .109     |
-          | # # # # # # # # # # |      | - | .109 to .159      |
-        2 | # # # # # # # # # # |      | . | .159 to .184      |
-          +---------------------+      +-----------------------+
-          1.6               3.6    Lambda unit
+          | # # # # # # # # # # |
+          | # # # # # # # # # # |      +- Legend -----------------+
+          | # # # # # # # # # # |      |   | RMSE                 |
+          | # # # # # # # # # # |      | X | Best RMSE (1.57e-11) |
+          | # # # # # # # # # # |      | # | 3.86e-12 to 1.23e-06 |
+          | # # # # # # # # # # |      | + | 1.23e-06 to 3.70e-06 |
+          | # # # # # # # # # # |      | - | 3.70e-06 to 6.17e-06 |
+        0 | # # # # # # # # # # |      | . | 6.17e-06 to 7.41e-06 |
+          +---------------------+      +--------------------------+
+           0                 .2    Lambda unit
+
+ Expanding search grid: Lambda unit and Lambda time sit on the edge of the range.
+
+  Phase 4: Evaluating 10x10x11 (unit, time, nuclear norm) grid.
+
+   10%  (10/100)   1:11 elapsed   about 10:39 remaining
+   20%  (20/100)   2:22 elapsed   about 9:28 remaining
+   30%  (30/100)   3:34 elapsed   about 8:19 remaining
+   40%  (40/100)   4:45 elapsed   about 7:07 remaining
+   50%  (50/100)   5:57 elapsed   about 5:57 remaining
+   55%  (55/100)   7:10 elapsed   about 5:51 remaining
+   60%  (60/100)   8:21 elapsed   about 5:34 remaining
+   65%  (65/100)   9:33 elapsed   about 5:08 remaining
+   70%  (70/100)   10:45 elapsed   about 4:36 remaining
+   75%  (75/100)   11:57 elapsed   about 3:59 remaining
+   80%  (80/100)   13:08 elapsed   about 3:17 remaining
+   85%  (85/100)   14:22 elapsed   about 2:32 remaining
+   90%  (90/100)   15:33 elapsed   about 1:43 remaining
+   95%  (95/100)   16:44 elapsed   about 0:52 remaining
+  100%  (100/100)   17:56 elapsed
+  Phase 4 chose lambdas (.4, .1, inf), on the edge of the searched range
+    Lambda unit  0 [================|==============*] .4
+    Lambda time  0 [================|==============*] .1
+    Lambda nn    0 [================|===============] .01
+
+Visualisation of RMSE across lambda time and unit (X lowest RMSE, . highest RMSE)
+     Each cell shows the lowest RMSE across all lambda_nn's searched.
+
+Lambda time
+       .1 | # # # # # # # # # X |
+          | # # # # # # # # # # |
+          | # # # # # # # # # # |
+          | # # # # # # # # # # |      +- Legend -----------------+
+          | # # # # # # # # # # |      |   | RMSE                 |
+          | # # # # # # # # # # |      | X | Best RMSE (1.08e-11) |
+          | # # # # # # # # # # |      | # | 3.86e-12 to 1.23e-06 |
+          | # # # # # # # # # # |      | + | 1.23e-06 to 3.70e-06 |
+          | # # # # # # # # # # |      | - | 3.70e-06 to 6.17e-06 |
+        0 | # # # # # # # # # # |      | . | 6.17e-06 to 7.41e-06 |
+          +---------------------+      +--------------------------+
+           0                 .4    Lambda unit
+
+ Expanding search grid: Lambda unit and Lambda time sit on the edge of the range.
+
+  Phase 5: Evaluating 10x10x11 (unit, time, nuclear norm) grid.
+
+   10%  (10/100)   1:11 elapsed   about 10:39 remaining
+   20%  (20/100)   2:20 elapsed   about 9:20 remaining
+   30%  (30/100)   3:31 elapsed   about 8:12 remaining
+   40%  (40/100)   4:45 elapsed   about 7:07 remaining
+   50%  (50/100)   5:55 elapsed   about 5:55 remaining
+   55%  (55/100)   7:08 elapsed   about 5:50 remaining
+   60%  (60/100)   8:24 elapsed   about 5:36 remaining
+   65%  (65/100)   9:37 elapsed   about 5:10 remaining
+   70%  (70/100)   10:49 elapsed   about 4:38 remaining
+   75%  (75/100)   12:01 elapsed   about 4:00 remaining
+   80%  (80/100)   13:12 elapsed   about 3:18 remaining
+   85%  (85/100)   14:24 elapsed   about 2:32 remaining
+   90%  (90/100)   15:35 elapsed   about 1:43 remaining
+   95%  (95/100)   16:48 elapsed   about 0:53 remaining
+  100%  (100/100)   17:59 elapsed
+  Phase 5 chose lambdas (.0889, .2, inf), on the edge of the searched range
+    Lambda unit  0 [===*============|===============] .8
+    Lambda time  0 [================|==============*] .2
+    Lambda nn    0 [================|===============] .01
+
+Visualisation of RMSE across lambda time and unit (X lowest RMSE, . highest RMSE)
+     Each cell shows the lowest RMSE across all lambda_nn's searched.
+
+Lambda time
+       .2 | # X # # # # # # # # |
+          | # # # # # # # # # # |
+          | # # # # # # # # # # |
+          | # # # # # # # # # # |      +- Legend -----------------+
+          | # # # # # # # # # # |      |   | RMSE                 |
+          | # # # # # # # # # # |      | X | Best RMSE (7.12e-12) |
+          | # # # # # # # # # # |      | # | 3.86e-12 to 1.23e-06 |
+          | # # # # # # # # # # |      | + | 1.23e-06 to 3.70e-06 |
+          | # # # # # # # # # # |      | - | 3.70e-06 to 6.17e-06 |
+        0 | # # # # # # # # # # |      | . | 6.17e-06 to 7.41e-06 |
+          +---------------------+      +--------------------------+
+           0                 .8    Lambda unit
+
+ Expanding search grid: Lambda time sits on the edge of the range.
+
+  Phase 6: Evaluating 10x10x11 (unit, time, nuclear norm) grid.
+
+   10%  (10/100)   1:12 elapsed   about 10:48 remaining
+   20%  (20/100)   2:23 elapsed   about 9:32 remaining
+   30%  (30/100)   3:35 elapsed   about 8:21 remaining
+   40%  (40/100)   4:46 elapsed   about 7:09 remaining
+   50%  (50/100)   5:58 elapsed   about 5:58 remaining
+   60%  (60/100)   7:09 elapsed   about 4:46 remaining
+   70%  (70/100)   8:21 elapsed   about 3:34 remaining
+   80%  (80/100)   9:34 elapsed   about 2:23 remaining
+   90%  (90/100)   10:47 elapsed   about 1:11 remaining
+  100%  (100/100)   11:59 elapsed
+  Phase 6 chose lambdas (.533, .178, inf)
+    Lambda unit  0 [================|====*==========] .8
+    Lambda time  0 [==============*=|===============] .4
+    Lambda nn    0 [================|===============] .01
+
+Visualisation of RMSE across lambda time and unit (X lowest RMSE, . highest RMSE)
+     Each cell shows the lowest RMSE across all lambda_nn's searched.
+
+Lambda time
+       .4 | # # # # # # # # # # |
+          | # # # # # # # # # # |
+          | # # # # # # # # # # |
+          | # # # # # # # # # # |      +- Legend -----------------+
+          | # # # # # # # # # # |      |   | RMSE                 |
+          | # # # # # # X # # # |      | X | Best RMSE (7.38e-12) |
+          | # # # # # # # # # # |      | # | 3.86e-12 to 1.23e-06 |
+          | # # # # # # # # # # |      | + | 1.23e-06 to 3.70e-06 |
+          | # # # # # # # # # # |      | - | 3.70e-06 to 6.17e-06 |
+        0 | # # # # # # # # # # |      | . | 6.17e-06 to 7.41e-06 |
+          +---------------------+      +--------------------------+
+           0                 .8    Lambda unit
 
  Adapting search grid:
-    Lambda unit  1.6 [===============]----------------- 3.6   [1.6 ; 2.54]
-    Lambda time  2 ------[================================]---------------------------- 22   [3.67 ; 13.7]
-    Lambda nn    0 [=======]------------------------- .05   [0 ; .0125] (and inf)
+    Lambda unit  0 --------------[===============]--- .8   [.333 ; .733]
+    Lambda time  0 ------[================]---------- .4   [.0778 ; .278]
+    Lambda nn    0 [================================] .01   [0 ; .01] (and inf)
 
   Evaluating 81 (unit x time) pairs in range, 10 nn values each
-  First replication 2:11, roughly 2:56:51 expected in total
-    5%  (5/81)   5:11 elapsed   about 1:18:47 remaining
-   10%  (9/81)   6:06 elapsed   about 48:48 remaining
-   15%  (13/81)   10:47 elapsed   about 56:24 remaining
-   20%  (17/81)   12:08 elapsed   about 45:40 remaining
-   25%  (21/81)   1:24:02 elapsed   about 4:00:05 remaining
-   30%  (25/81)   1:25:37 elapsed   about 3:11:46 remaining
-   35%  (29/81)   1:31:11 elapsed   about 2:43:30 remaining
-   40%  (33/81)   1:33:05 elapsed   about 2:15:23 remaining
-   45%  (37/81)   1:36:33 elapsed   about 1:54:48 remaining
-   50%  (41/81)   1:39:44 elapsed   about 1:37:18 remaining
-   55%  (45/81)   1:41:07 elapsed   about 1:20:53 remaining
-   60%  (49/81)   1:45:40 elapsed   about 1:09:00 remaining
-   65%  (53/81)   1:46:51 elapsed   about 56:26 remaining
-   70%  (57/81)   1:51:35 elapsed   about 46:58 remaining
-   75%  (61/81)   1:52:44 elapsed   about 36:57 remaining
-   80%  (65/81)   1:57:24 elapsed   about 28:53 remaining
-   85%  (69/81)   1:59:09 elapsed   about 20:43 remaining
-   90%  (73/81)   2:01:26 elapsed   about 13:18 remaining
-   95%  (77/81)   2:03:39 elapsed   about 6:25 remaining
-  100%  (81/81)   2:04:16 elapsed
+  First replication 0:13, roughly 17:33 expected in total
+    5%  (5/81)   1:08 elapsed   about 17:13 remaining
+   10%  (9/81)   2:00 elapsed   about 16:00 remaining
+   15%  (13/81)   2:54 elapsed   about 15:10 remaining
+   20%  (17/81)   3:46 elapsed   about 14:10 remaining
+   25%  (21/81)   4:39 elapsed   about 13:17 remaining
+   30%  (25/81)   5:31 elapsed   about 12:21 remaining
+   35%  (29/81)   6:25 elapsed   about 11:30 remaining
+   40%  (33/81)   7:17 elapsed   about 10:35 remaining
+   45%  (37/81)   8:10 elapsed   about 9:42 remaining
+   50%  (41/81)   9:04 elapsed   about 8:50 remaining
+   55%  (45/81)   9:57 elapsed   about 7:57 remaining
+   60%  (49/81)   10:51 elapsed   about 7:05 remaining
+   65%  (53/81)   11:42 elapsed   about 6:10 remaining
+   70%  (57/81)   12:35 elapsed   about 5:17 remaining
+   75%  (61/81)   13:32 elapsed   about 4:26 remaining
+   80%  (65/81)   14:30 elapsed   about 3:34 remaining
+   85%  (69/81)   15:24 elapsed   about 2:40 remaining
+   90%  (73/81)   16:16 elapsed   about 1:46 remaining
+   95%  (77/81)   17:09 elapsed   about 0:53 remaining
+  100%  (81/81)   18:01 elapsed
 
-  Best after zoom (2.31, 8.67, 0), 76:15:07 total
-    Lambda unit  1.6 [===========*===]----------------- 3.6
-    Lambda time  2 ------[===============*================]---------------------------- 22
-    Lambda nn    0 [*======]------------------------- .05
+  Best after zoom (.433, .203, inf), 2:12:01 total
+    Lambda unit  0 --------------[===*===========]--- .8
+    Lambda time  0 ------[==========*=====]---------- .4
+    Lambda nn    0 [================================] .01
 
 Visualisation of RMSE across lambda time and unit (X lowest RMSE, . highest RMSE)
      Each cell shows the lowest RMSE across all lambda_nn's searched in the adapted range.
 
 Lambda time
-     13.7 | + - - - - - - - - |
-          | - - - - - - - - - |
-          | - - - - - - - - - |      +- Legend --------------+
-          | - - - + - - - - - |      |   | RMSE              |
-          | - - - - - - X - - |      | X | Best RMSE (.0357) |
-          | - - - - - - - - - |      | # | .0357 to .0358    |
-          | - - - - - - - - - |      | + | .0358 to .0359    |
-          | - - - - - - - - - |      | - | .0359 to .0361    |
-     3.67 | . . . . . . . . . |      | . | .0361 to .0362    |
-          +-------------------+      +-----------------------+
-          1.6             2.54    Lambda unit
+     .278 | - - . - - - - - - |
+          | + + + + + + + + + |
+          | # # # # # # # # # |      +- Legend -----------------+
+          | # # X # # # # # # |      |   | RMSE                 |
+          | # # # # # # # # # |      | X | Best RMSE (7.08e-12) |
+          | # # # # # # # # # |      | # | 7.08e-12 to 1.65e-11 |
+          | # # # # # # # # # |      | + | 1.65e-11 to 3.54e-11 |
+          | # # # # # # # # # |      | - | 3.54e-11 to 5.43e-11 |
+    .0778 | # # # # # # # # # |      | . | 5.43e-11 to 6.38e-11 |
+          +-------------------+      +--------------------------+
+          .333            .733    Lambda unit
 
-  Best over all evaluated lambdas (2.04, 8.67, 0)
+  Best over all evaluated lambdas (0, 0, .005)
 
-Selected lambda: unit, time and nn = [2.044444 ; 8.666667 ; 0]
+Selected lambda: unit, time and nn = [0 ; 0 ; .005]
 ```
 
 </details>
@@ -706,20 +818,20 @@ Selected lambda: unit, time and nn = [2.044444 ; 8.666667 ; 0]
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
-         ATT |     0.01491
+         ATT |     0.04648
              |  (no inference; vce(noinference))
 -------------+--------------------------------------------------
      N units |         111
    T periods |          48
    N treated |           1
 -------------+--------------------------------------------------
- lambda_unit |      2.0444
- lambda_time |      8.6667
-   lambda_nn |           0
+ lambda_unit |      0.0000
+ lambda_time |      0.0000
+   lambda_nn |        .005
              |  (selected by loocv CV)
 ----------------------------------------------------------------
 ```
-As you can see, the adaptive grid searches lambda time past the default maximum (8.67 against 4), which shows the cycle search was constrained by the grid. The ATT is slightly closer to zero using adaptive, at 0.01491.
+The adaptive search ends at the corner of the starting grid, (0, 0, .005), and the ATT moves further from zero, to 0.04648. The heat maps show why. The LOOCV RMSE is of the order 1e-12 to 1e-6 across the whole low-lambda region, so the criterion is flat there and cannot separate one triplet from another. With a single treated cell the adaptive refinement adds nothing over cycle.
 ### Block adoption
  
 Under block adoption, units are treated simultaneously in the final 18 periods. Under `group(time)`, which is the default, this is one pooled spell of 270 cells (15 units × 18 periods):
@@ -733,22 +845,23 @@ which returns
 ```
 Cross-validating lambdas using resample with cycle search, and 200 trials (seed 1).
 To reduce resample computational time, reduce no of trials or set lambdas.
-  cycle 1 of up to 50:  lambda_unit -> 0   lambda_time -> 0   lambda_nn -> .1   5:58 elapsed
-  cycle 2 of up to 50:  lambda_unit -> 0   lambda_time -> 0   lambda_nn -> .1   18:58 elapsed
-  converged after 2 cycle(s), 18:58 total
+  cycle 1 of up to 50:  lambda_unit -> 1.2   lambda_time -> 1   lambda_nn -> .005   3:58 elapsed
+  cycle 2 of up to 50:  lambda_unit -> .8   lambda_time -> 1   lambda_nn -> .1   17:03 elapsed
+  cycle 3 of up to 50:  lambda_unit -> .8   lambda_time -> 1   lambda_nn -> .1   22:36 elapsed
+  converged after 3 cycle(s), 22:36 total
 
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
-         ATT |     0.01046
+         ATT |     0.00923
              |  (no inference; vce(noinference))
 -------------+--------------------------------------------------
      N units |         111
    T periods |          48
    N treated |          15
 -------------+--------------------------------------------------
- lambda_unit |      0.0000
- lambda_time |      0.0000
+ lambda_unit |      0.8000
+ lambda_time |      1.0000
    lambda_nn |          .1
              |  (selected by resample CV)
 ----------------------------------------------------------------
@@ -763,32 +876,35 @@ trop y unit time w_block, group(cell) cv(loocv, cells(200) seed(1))
 ```
 Cross-validating lambdas using loocv with cycle search, and 200 samples of 5058 total control cells.
 To reduce loocv computational time, reduce number of cells or set lambdas.
-  marginal:  lambda_time -> 4   lambda_unit -> 2   lambda_nn -> .25   1:37 elapsed
-  cycle 1 of up to 50:  lambda_unit -> 2   lambda_time -> 4   lambda_nn -> .025   5:33 elapsed
-  cycle 2 of up to 50:  lambda_unit -> 2   lambda_time -> 4   lambda_nn -> .025   16:28 elapsed
-  converged after 2 cycle(s), 16:28 total
+  marginal:  lambda_time -> .2   lambda_unit -> 2   lambda_nn -> .005   0:34 elapsed
+  cycle 1 of up to 50:  lambda_unit -> .2   lambda_time -> .2   lambda_nn -> .1   1:45 elapsed
+  cycle 2 of up to 50:  lambda_unit -> .3   lambda_time -> .2   lambda_nn -> .25   2:50 elapsed
+  cycle 3 of up to 50:  lambda_unit -> .3   lambda_time -> .2   lambda_nn -> .25   3:53 elapsed
+  converged after 3 cycle(s), 3:53 total
 Computing 270 group effects.
-  100%  (270/270)   0:04 elapsed
+   35%  (95/270)   0:30 elapsed   about 0:55 remaining
+   75%  (203/270)   1:02 elapsed   about 0:20 remaining
+  100%  (270/270)   1:22 elapsed
 
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
-         ATT |    -0.23351
+         ATT |    -0.00719
              |  (no inference; vce(noinference))
 -------------+--------------------------------------------------
      N units |         111
    T periods |          48
    N treated |          15
 -------------+--------------------------------------------------
- lambda_unit |      2.0000
- lambda_time |      4.0000
-   lambda_nn |        .025
+ lambda_unit |      0.3000
+ lambda_time |      0.2000
+   lambda_nn |         .25
              |  (selected by loocv CV)
 ----------------------------------------------------------------
 (270 per-cell effects: e(group_grid) [unit x time], e(group_tau), e(group_info))
 ```
  
-The treatment effect are a lot higher using the parameters chosen by LOOCV. We'll study heterogenous treatment effects more closely by using `e(group_grid)`:
+Both routes give an ATT close to zero, but the pooled estimate hides a lot of per-cell variation. We'll study heterogenous treatment effects more closely by using `e(group_grid)`:
  
 ```s
 matrix list e(group_grid), format(%9.4f)
@@ -796,16 +912,16 @@ matrix list e(group_grid), format(%9.4f)
  
 ```
 e(group_grid)[15,18]
-          t31      t32      t33      t34      t35      t36      t37      t38      t39      t40      t41      t42      t43      t44
- u97  -0.0019   0.0033  -0.0026  -0.0496  -0.1380  -0.9494  -1.0950  -1.1172  -1.1144  -1.1134  -1.1222  -1.0684  -0.9989  -0.9882
- u98   0.0233   0.0063  -0.0426  -0.2155  -0.2160  -0.8222  -0.9198  -0.9473  -0.9809  -0.9648  -0.9726  -0.9572  -0.9014  -0.9146
- u99   0.0715   0.1253   0.1810   0.2353   0.2291  -0.0618  -0.1138  -0.1597  -0.2089  -0.1765  -0.1540  -0.1198  -0.0469  -0.0502
-u100  -0.0079  -0.0014  -0.0321  -0.0560  -0.0522   0.0158   0.0359   0.0387   0.0603   0.1105   0.1458   0.1856   0.2672   0.2926
-u101   0.0316   0.0408   0.0725   0.0636   0.0188  -0.2378  -0.2742  -0.2865  -0.2820  -0.2435  -0.2214  -0.1813  -0.1264  -0.1366
+          t31      t32      t33      t34      t35      t36      t37      t38      t39      t40      t41
+ u97  -0.0365  -0.0446  -0.0600  -0.1164  -0.1181  -0.1522  -0.1930  -0.2088  -0.1897  -0.2381  -0.2843
+ u98  -0.0157  -0.0556  -0.1148  -0.2970  -0.2135  -0.1952  -0.1934  -0.2359  -0.3000  -0.3242  -0.3739
+ u99   0.1373   0.2239   0.3171   0.3889   0.4317   0.4656   0.4924   0.4637   0.3882   0.4053   0.4233
+u100  -0.0467  -0.0649  -0.1164  -0.1465  -0.1191  -0.1114  -0.0971  -0.0906  -0.0496  -0.0071   0.0209
+u101   0.0332   0.0430   0.0802   0.0764   0.0842   0.0618   0.0820   0.0906   0.1091   0.1328   0.1426
 (output truncated)
 ```
  
-Under block adoption, LOOCV with `group(cell)` performs poorly relative to resample with `group(time)`. The heterogenous treatment effects above shows that units further from the onset of treatment have larger treatment effects. This is because LOOCV estimates placebo effects using control units which are surrounded by adjacent donor units. CV minimises the criterion under this design, and chooses lambdas which are large (`lambda_time=4`). This heavily weights nearby units. However, treated units in block actually sit far from control units (i.e. up to 19 periods). Resample CV under `group(time)` suits block adoption, because the CV uses the actual treatment pattern on a subset of never-treated control units from the panel. As a result, we recommend using resample under block adoption with many treated periods. 
+The per-cell effects drift away from zero the further a cell sits from the onset of treatment, with opposite signs across units, so the pooled ATT of -0.007 is small only because they cancel. This is a mismatch between the LOOCV design and block adoption. LOOCV estimates placebo effects on control cells which are surrounded by untreated donor cells on both sides, so the criterion says nothing about extrapolating up to 18 periods past the last untreated period. Resample CV under `group(time)` suits block adoption, because the CV uses the actual treatment pattern on a subset of never-treated control units from the panel. As a result, we recommend using resample under block adoption with many treated periods. 
  
 ### Staggered adoption
  
@@ -818,31 +934,31 @@ trop y unit time w_stag, cv(resample, seed(1)) detail
 ```
 Cross-validating lambdas using resample with cycle search, and 200 trials (seed 1).
 To reduce resample computational time, reduce no of trials or set lambdas.
-  cycle 1 of up to 50:  lambda_unit -> 0   lambda_time -> 0   lambda_nn -> .005   21:37 elapsed
-  cycle 2 of up to 50:  lambda_unit -> 0   lambda_time -> 0   lambda_nn -> .005   2:42:31 elapsed
-  converged after 2 cycle(s), 2:42:31 total
+  cycle 1 of up to 50:  lambda_unit -> 1.2   lambda_time -> 1   lambda_nn -> .5   14:05 elapsed
+  cycle 2 of up to 50:  lambda_unit -> 1.2   lambda_time -> 1   lambda_nn -> .5   24:42 elapsed
+  converged after 2 cycle(s), 24:42 total
 
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
-         ATT |    -0.01011
+         ATT |     0.01913
              |  (no inference; vce(noinference))
 -------------+--------------------------------------------------
      N units |         111
    T periods |          48
    N treated |          15
 -------------+--------------------------------------------------
- lambda_unit |      0.0000
- lambda_time |      0.0000
-   lambda_nn |        .005
+ lambda_unit |      1.2000
+ lambda_time |      1.0000
+   lambda_nn |          .5
              |  (selected by resample CV)
 ----------------------------------------------------------------
 (3 per-spell effects in e(group_tau), e(group_weight), e(group_info), e(group_units))
 
 time periods  start   end  units  cells        tau   cohort's units
-      t21_48     21    48      5    140    -0.0453   97 98 99 100 101
-      t31_48     31    48      5     90     0.0595   102 103 104 105 106
-      t41_48     41    48      5     40    -0.0435   107 108 109 110 111
+      t21_48     21    48      5    140    -0.0185   97 98 99 100 101
+      t31_48     31    48      5     90     0.1243   102 103 104 105 106
+      t41_48     41    48      5     40    -0.0859   107 108 109 110 111
 ```
  
 The per-cohort effects are also returned in `e(group_tau)` if you have not used the detail option (but the indexed cohort units are not):
@@ -854,7 +970,7 @@ matrix list e(group_tau)
 ```
 e(group_tau)[1,3]
         t21_48      t31_48      t41_48
-r1  -.04527924   .05947124  -.04354185
+r1  -.01845019   .12427219  -.08588071
 ```
 ### General assignment
  
@@ -871,7 +987,7 @@ Computing 51 group effects.
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
-         ATT |     0.00128
+         ATT |     0.00207
              |  (no inference; vce(noinference))
 -------------+--------------------------------------------------
      N units |         111
@@ -920,14 +1036,14 @@ which returns
 ```
 To reduce computational time, reduce reps() or use vce(jackknife).
 Bootstrap inference using 200 bootstrap replications.
-  100%  (200/200)   0:13 elapsed
+  100%  (200/200)   0:05 elapsed
 
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
-         ATT |     0.02963
-   Std. err. |     0.02087
-      95% CI |   -0.01074    0.06781
+         ATT |     0.02050
+   Std. err. |     0.02094
+      95% CI |   -0.02298    0.05610
 -------------+--------------------------------------------------
      N units |         111
    T periods |          48
@@ -946,14 +1062,14 @@ trop y unit time w, lambda_unit(0) lambda_time(1) lambda_nn(0.1) vce(jackknife)
 
 ```
 Jackknife inference using 111 leave-one-out replications.
-  100%  (111/111)   0:09 elapsed
+  100%  (111/111)   0:02 elapsed
 
 ----------------------------------------------------------------
         TROP |  Triply Robust Panel estimator
 -------------+--------------------------------------------------
-         ATT |     0.02963
-   Std. err. |     0.02242
-      95% CI |   -0.01431    0.07357
+         ATT |     0.02050
+   Std. err. |     0.02245
+      95% CI |   -0.02349    0.06450
 -------------+--------------------------------------------------
      N units |         111
    T periods |          48
