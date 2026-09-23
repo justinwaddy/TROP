@@ -150,9 +150,10 @@ i{=}5 & 0 & 0 & 0 & 0 & 0 & 0
 
 ## Examples
 
-In these examples, we use Penn Word Tables (`trop_panel_penn.csv`) to conduct a null effect study. First, load in the data:
+In these examples, we use Penn World Tables (`trop_panel_penn.csv`) to conduct a null effect study. First, install TROP and load in the data:
 ```s
-import delimited "trop_panel_penn.csv", varnames(1) clear
+net install trop, from("https://raw.githubusercontent.com/justinwaddy/TROP/main/") replace
+import delimited "https://raw.githubusercontent.com/justinwaddy/TROP/main/trop_panel_penn.csv", varnames(1) clear
 xtset unit time
 ```
 Next, we will generate four different treatment patterns. The patterns are: one treated unit with a single treated period, simultaneous adoption, staggered adoption, and general pattern assignment.
