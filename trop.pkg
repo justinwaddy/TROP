@@ -1,8 +1,9 @@
-v 1.0.0
-d 'TROP': Triply Robust Panel Estimators
-d 
-d Distribution-Date:   2025-XX-XX
-d License: GNU v3.0
-d 
+v 3
+d 'TROP': Triply Robust Panel Estimators for Stata
+d
+d Distribution-Date: 20260923
+d License: GNU GPL v3.0
+d
 F trop.ado
 F trop.sthlp
+f trop_panel_penn.csv
